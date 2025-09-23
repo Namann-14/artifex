@@ -26,6 +26,7 @@
   "author": "",
   "license": "MIT",
   "dependencies": {
+    "@clerk/backend": "^2.15.0",
     "@clerk/express": "^1.7.31",
     "@clerk/types": "^4.25.1",
     "@google/generative-ai": "^0.15.0",

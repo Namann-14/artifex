@@ -7,7 +7,7 @@ export async function POST(req: NextRequest) {
     
     if (!userId) {
       return NextResponse.json(
-        { error: 'Authentication required' },
+        { success: false, message: 'Authentication required' },
         { status: 401 }
       );
     }
@@ -28,7 +28,7 @@ export async function POST(req: NextRequest) {
 
     if (!prompt) {
       return NextResponse.json(
-        { error: 'Prompt is required' },
+        { success: false, message: 'Prompt is required' },
         { status: 400 }
       );
     }
@@ -36,11 +36,32 @@ export async function POST(req: NextRequest) {
     // Get the authentication token
     const token = await getToken();
     
+    if (!token) {
+      return NextResponse.json(
+        { success: false, message: 'Failed to get authentication token' },
+        { status: 401 }
+      );
+    }
+
     // Get the backend URL from environment
     const backendUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api/v1';
+    
+    // Map the type to correct backend endpoint
+    const endpointMap: { [key: string]: string } = {
+      'text-to-image': 'text-to-image',
+      'image-to-image': 'image-to-image',
+      'multi-image': 'multi-image',
+      'refine': 'refine'
+    };
+    
+    const endpoint = endpointMap[type] || 'text-to-image';
+    
+    console.log('Forwarding to backend:', `${backendUrl}/generate/${endpoint}`);
+    console.log('Token present:', !!token);
+    console.log('Request payload:', { prompt, style, quality, dimensions });
 
     // Forward the request to your backend server
-    const backendResponse = await fetch(`${backendUrl}/generate/${type}`, {
+    const backendResponse = await fetch(`${backendUrl}/generate/${endpoint}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -54,26 +75,48 @@ export async function POST(req: NextRequest) {
       }),
     });
 
+    console.log('Backend response status:', backendResponse.status);
+    console.log('Backend response headers:', Object.fromEntries(backendResponse.headers.entries()));
+
     if (!backendResponse.ok) {
-      const errorData = await backendResponse.json();
+      const errorText = await backendResponse.text();
+      console.error('Backend error response:', errorText);
+      
+      let errorData;
+      try {
+        errorData = JSON.parse(errorText);
+      } catch {
+        errorData = { message: errorText };
+      }
+      
       return NextResponse.json(
         { 
-          error: errorData.message || 'Generation failed',
-          status: backendResponse.status 
+          success: false,
+          message: errorData.message || errorData.error || 'Generation failed',
+          status: backendResponse.status,
+          debug: {
+            backendUrl: `${backendUrl}/generate/${endpoint}`,
+            hasToken: !!token,
+            userId: userId
+          }
         },
         { status: backendResponse.status }
       );
     }
 
     const result = await backendResponse.json();
+    console.log('Backend success response:', result);
 
-    // Return the response from your backend
-    return NextResponse.json(result);
+    // Return the response from your backend with success flag
+    return NextResponse.json({
+      success: true,
+      ...result
+    });
 
   } catch (error) {
     console.error('Generate API error:', error);
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { success: false, message: 'Internal server error', error: error instanceof Error ? error.message : 'Unknown error' },
       { status: 500 }
     );
   }

@@ -13,7 +13,7 @@ export class DatabaseUtils {
     tier: SubscriptionTier;
     reason?: string;
   }> {
-    const user = await UserModel.findById(userId);
+    const user = await UserModel.findByClerkId(userId);
     
     if (!user) {
       throw new Error('User not found');
@@ -34,7 +34,7 @@ export class DatabaseUtils {
   }
 
   static async consumeUserQuota(userId: string, credits: number = 1): Promise<void> {
-    const user = await UserModel.findById(userId);
+    const user = await UserModel.findByClerkId(userId);
     
     if (!user) {
       throw new Error('User not found');
@@ -48,7 +48,7 @@ export class DatabaseUtils {
   }
 
   static async resetUserQuota(userId: string): Promise<void> {
-    const user = await UserModel.findById(userId);
+    const user = await UserModel.findByClerkId(userId);
     
     if (!user) {
       throw new Error('User not found');
@@ -100,7 +100,7 @@ export class DatabaseUtils {
     await subscription.upgrade(newTier);
     
     // Update user's subscription tier
-    const user = await UserModel.findById(userId);
+    const user = await UserModel.findByClerkId(userId);
     if (user) {
       await user.updateSubscription(newTier);
     }
@@ -188,7 +188,7 @@ export class DatabaseUtils {
     startDate.setDate(startDate.getDate() - days);
 
     const [user, subscription, recentGenerations, generationStats] = await Promise.all([
-      UserModel.findById(userId),
+      UserModel.findByClerkId(userId),
       SubscriptionModel.findByUserId(userId),
       ImageGenerationModel.findRecentByUser(userId, days),
       ImageGenerationModel.getUserStats(userId)
@@ -289,7 +289,7 @@ export class DatabaseUtils {
   static async bulkUpdateUserQuotas(updates: Array<{ userId: string; monthlyUsage: number }>): Promise<void> {
     const bulkOps = updates.map(({ userId, monthlyUsage }) => ({
       updateOne: {
-        filter: { _id: new Types.ObjectId(userId) },
+        filter: { clerkId: userId },
         update: { $set: { monthlyUsage } }
       }
     }));

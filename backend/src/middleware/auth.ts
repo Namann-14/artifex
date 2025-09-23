@@ -22,61 +22,90 @@ declare global {
         sessionId?: string | null;
         getToken?: () => Promise<string | null>;
       };
+      user?: {
+        id: string;
+        subscriptionStatus?: string;
+      };
     }
   }
 }
 
-// Middleware to require authentication - custom implementation
+// Middleware to require authentication - using proper Clerk verification
 export const requireAuthentication = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
     const authHeader = req.headers.authorization;
     
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      throw new UnauthorizedError('Authentication required - no token');
+      throw new UnauthorizedError('Authentication required - no token provided');
     }
 
     const token = authHeader.substring(7); // Remove 'Bearer ' prefix
     console.log('Token received:', token.substring(0, 50) + '...');
     
-    // Decode the token without verification to see the payload
+    // Use Clerk's built-in token verification
     try {
-      const decoded = jwt.decode(token) as any;
-      console.log('Token payload:', {
-        sub: decoded?.sub,
-        sid: decoded?.sid,
-        sts: decoded?.sts,
-        exp: decoded?.exp,
-        iss: decoded?.iss
-      });
+      // First try to get auth from Clerk middleware that should have already run
+      const auth = getAuth(req);
       
-      // Set up req.auth with the token data
-      (req as any).auth = {
-        userId: decoded?.sub || null,
-        sessionId: decoded?.sid || null,
-        getToken: async () => token,
-      };
+      if (!auth.userId) {
+        // If Clerk middleware didn't set auth, try manual verification
+        const { verifyToken } = await import('@clerk/backend');
+        
+        const payload = await verifyToken(token, {
+          secretKey: config.CLERK_SECRET_KEY,
+        });
+        
+        console.log('Token verified successfully:', {
+          sub: payload.sub,
+          sid: payload.sid,
+          exp: payload.exp
+        });
+        
+        // Set up req.auth with verified token data
+        (req as any).auth = {
+          userId: payload.sub,
+          sessionId: payload.sid,
+          getToken: async () => token,
+        };
+      } else {
+        // Use auth from Clerk middleware
+        (req as any).auth = {
+          userId: auth.userId,
+          sessionId: auth.sessionId,
+          getToken: async () => token,
+        };
+        
+        console.log('Using Clerk middleware auth:', {
+          userId: auth.userId,
+          sessionId: auth.sessionId
+        });
+      }
       
-      if (!decoded?.sub) {
+      if (!(req as any).auth?.userId) {
         throw new UnauthorizedError('Invalid token - no user ID');
       }
       
-  next();
-  return;
+      next();
+      return;
+      
     } catch (tokenError) {
-      console.error('Token parsing error:', tokenError);
-      throw new UnauthorizedError('Invalid token format');
-  }
+      console.error('Token verification error:', tokenError);
+      throw new UnauthorizedError('Invalid or expired token');
+    }
     
   } catch (error) {
     logger.error('Authentication error:', error as Error);
     if (error instanceof UnauthorizedError) {
       res.status(401).json({ 
-        error: 'Authentication required', 
+        success: false,
         message: (error as Error).message 
       });
       return;
     }
-    res.status(401).json({ error: 'Authentication required' });
+    res.status(401).json({ 
+      success: false, 
+      message: 'Authentication required' 
+    });
     return;
   }
 };

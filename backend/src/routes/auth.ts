@@ -6,6 +6,72 @@ import { ApiResponse } from '../types';
 
 const router = Router();
 
+// Debug endpoint to check token without authentication (for testing)
+router.post('/debug-token', asyncHandler(async (req: Request, res: Response) => {
+  const authHeader = req.headers.authorization;
+  
+  console.log('Debug token request received');
+  console.log('Authorization header:', authHeader ? 'present' : 'missing');
+  console.log('Headers:', JSON.stringify(req.headers, null, 2));
+  
+  if (!authHeader) {
+    return res.json({
+      success: false,
+      message: 'No authorization header provided',
+      debug: {
+        headers: req.headers,
+        hasToken: false
+      }
+    });
+  }
+  
+  if (!authHeader.startsWith('Bearer ')) {
+    return res.json({
+      success: false,
+      message: 'Authorization header does not start with Bearer',
+      debug: {
+        authHeader: authHeader.substring(0, 50) + '...',
+        hasToken: false
+      }
+    });
+  }
+  
+  const token = authHeader.substring(7);
+  console.log('Token extracted:', token.substring(0, 50) + '...');
+  
+  try {
+    // Try to verify with Clerk
+    const { verifyToken } = await import('@clerk/backend');
+    const payload = await verifyToken(token, {
+      secretKey: process.env.CLERK_SECRET_KEY!,
+    });
+    
+    return res.json({
+      success: true,
+      message: 'Token is valid',
+      debug: {
+        hasToken: true,
+        tokenLength: token.length,
+        userId: payload.sub,
+        sessionId: payload.sid,
+        expiresAt: new Date(payload.exp * 1000).toISOString()
+      }
+    });
+    
+  } catch (error) {
+    console.error('Token verification failed:', error);
+    return res.json({
+      success: false,
+      message: 'Token verification failed',
+      debug: {
+        hasToken: true,
+        tokenLength: token.length,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      }
+    });
+  }
+}));
+
 // Get authenticated user profile
 router.get('/me', requireAuthentication, asyncHandler(async (req: Request, res: Response) => {
   const userInfo = AuthUtils.extractUserInfo(req);

@@ -2,20 +2,48 @@ import { Request, Response } from 'express';
 import { ImageGenerationOrchestrator } from '../services/imageGenerationOrchestrator';
 import { logger } from '../utils/logger';
 import { SubscriptionTier } from '../types';
+import { UserModel } from '../models/User';
 import fs from 'fs';
-
-interface AuthenticatedRequest extends Request {
-  user?: {
-    id: string;
-    subscriptionStatus?: string;
-  };
-}
 
 export class ImageGenerationController {
   private orchestrator: ImageGenerationOrchestrator;
 
   constructor() {
     this.orchestrator = new ImageGenerationOrchestrator();
+  }
+
+  private async ensureUserExists(clerkId: string): Promise<any> {
+    let user = await UserModel.findByClerkId(clerkId);
+    
+    if (!user) {
+      // Create a basic user record if it doesn't exist
+      try {
+        user = await UserModel.create({
+          clerkId,
+          email: `${clerkId}@temp.example.com`, // Temporary email, should be updated via webhook
+          name: 'User',
+          subscriptionTier: 'free',
+          monthlyUsage: 0,
+          totalImagesGenerated: 0,
+          isActive: true,
+          emailVerified: false,
+          preferences: {
+            defaultImageSize: '1024x1024',
+            defaultStyle: 'realistic',
+            emailNotifications: true,
+            marketingEmails: false,
+            theme: 'auto',
+            language: 'en'
+          }
+        });
+        console.log('Created new user record for Clerk ID:', clerkId);
+      } catch (error) {
+        console.error('Failed to create user:', error);
+        throw new Error('Failed to create user record');
+      }
+    }
+    
+    return user;
   }
 
   private createPermissions(subscriptionTier: SubscriptionTier) {
@@ -59,20 +87,30 @@ export class ImageGenerationController {
   /**
    * Generate image from text prompt
    */
-  async textToImage(req: AuthenticatedRequest, res: Response): Promise<void> {
+  async textToImage(req: Request, res: Response): Promise<void> {
     try {
       const { prompt, aspectRatio, style, quality } = req.body;
-      const userId = req.user?.id;
+      const userId = req.auth?.userId || req.user?.id;
 
       if (!userId) {
+        console.log('No userId found in request:', { 
+          hasAuth: !!req.auth, 
+          authUserId: req.auth?.userId, 
+          hasUser: !!req.user,
+          userUserId: req.user?.id 
+        });
         res.status(401).json({ 
           success: false, 
-          message: 'Authentication required' 
+          message: 'Authentication required - no user ID found' 
         });
         return;
       }
 
-      const subscriptionTier = (req.user?.subscriptionStatus || 'free') as SubscriptionTier;
+      console.log('Text-to-image request from user:', userId);
+
+      // Ensure user exists in database
+      const user = await this.ensureUserExists(userId);
+      const subscriptionTier = user.subscriptionTier as SubscriptionTier;
 
       logger.info('Text-to-image generation request', {
         userId,
@@ -120,10 +158,10 @@ export class ImageGenerationController {
   /**
    * Transform existing image with text prompt
    */
-  async imageToImage(req: AuthenticatedRequest, res: Response): Promise<void> {
+  async imageToImage(req: Request, res: Response): Promise<void> {
     try {
       const { prompt, transformationType, strength } = req.body;
-      const userId = req.user?.id;
+      const userId = req.auth?.userId || req.user?.id;
       const sourceImage = req.file;
 
       if (!userId) {
@@ -193,10 +231,10 @@ export class ImageGenerationController {
   /**
    * Compose multiple images into single output
    */
-  async multiImageComposition(req: AuthenticatedRequest, res: Response): Promise<void> {
+  async multiImageComposition(req: Request, res: Response): Promise<void> {
     try {
       const { prompt, compositionType, layout } = req.body;
-      const userId = req.user?.id;
+      const userId = req.auth?.userId || req.user?.id;
       const sourceImages = req.files as Express.Multer.File[];
 
       if (!userId) {
@@ -269,7 +307,7 @@ export class ImageGenerationController {
   /**
    * Refine existing image with detailed adjustments
    */
-  async refineImage(req: AuthenticatedRequest, res: Response): Promise<void> {
+  async refineImage(req: Request, res: Response): Promise<void> {
     try {
       const { 
         prompt, 
@@ -277,7 +315,7 @@ export class ImageGenerationController {
         adjustments, 
         preserveAspectRatio 
       } = req.body;
-      const userId = req.user?.id;
+      const userId = req.auth?.userId || req.user?.id;
       const sourceImage = req.file;
 
       if (!userId) {
@@ -354,9 +392,9 @@ export class ImageGenerationController {
   /**
    * Get generation history for user
    */
-  async getGenerationHistory(req: AuthenticatedRequest, res: Response): Promise<void> {
+  async getGenerationHistory(req: Request, res: Response): Promise<void> {
     try {
-      const userId = req.user?.id;
+      const userId = req.auth?.userId || req.user?.id;
       const { page = 1, limit = 20, type } = req.query;
 
       if (!userId) {
@@ -400,9 +438,9 @@ export class ImageGenerationController {
   /**
    * Get user's current generation quota and usage
    */
-  async getQuotaStatus(req: AuthenticatedRequest, res: Response): Promise<void> {
+  async getQuotaStatus(req: Request, res: Response): Promise<void> {
     try {
-      const userId = req.user?.id;
+      const userId = req.auth?.userId || req.user?.id;
 
       if (!userId) {
         res.status(401).json({ 

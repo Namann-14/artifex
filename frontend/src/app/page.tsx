@@ -52,23 +52,38 @@ const ChatBotDemo = () => {
     setError(null);
 
     try {
-      const response = await fetch('/api/generate', {
+      // Get authentication token from Clerk
+      const token = await getToken();
+      
+      if (!token) {
+        throw new Error('Not authenticated. Please sign in first.');
+      }
+
+      const response = await fetch('http://localhost:3001/api/v1/generate/text-to-image', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
         },
         body: JSON.stringify({
           prompt: input.trim(),
-          type: 'text-to-image',
           style: 'realistic',
-          quality: 'high',
+          quality: 'standard',
+          dimensions: {
+            width: 1024,
+            height: 1024
+          },
+          negativePrompt: 'blurry, low quality',
+          seed: Math.floor(Math.random() * 100000)
         }),
       });
 
       const result = await response.json();
 
-      if (!response.ok) {
-        throw new Error(result.error || 'Generation failed');
+      console.log('API Response:', result);
+
+      if (!response.ok || !result.success) {
+        throw new Error(result.message || result.error || 'Generation failed');
       }
 
       const assistantMessage: Message = {

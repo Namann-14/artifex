@@ -490,7 +490,7 @@ export class ImageGenerationOrchestrator {
    */
   private async validateGenerationContext(context: GenerationContext): Promise<void> {
     // Validate user exists and is active
-    const user = await UserModel.findById(context.userId);
+    const user = await UserModel.findByClerkId(context.userId);
     if (!user || !user.isActive) {
       throw new ValidationError(
         'User not found or inactive',
@@ -629,7 +629,7 @@ export class ImageGenerationOrchestrator {
       }
 
       // Consume quota
-      const user = await UserModel.findById(context.userId);
+      const user = await UserModel.findByClerkId(context.userId);
       if (!user) {
         return {
           success: false,
