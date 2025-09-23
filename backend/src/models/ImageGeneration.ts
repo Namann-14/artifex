@@ -104,7 +104,7 @@ const metadataSchema = new Schema({
   model: {
     type: String,
     required: [true, 'Model is required'],
-    enum: ['dall-e-2', 'dall-e-3', 'stable-diffusion', 'midjourney']
+    enum: ['dall-e-2', 'dall-e-3', 'stable-diffusion', 'midjourney', 'gemini-2.0-flash-exp']
   },
   version: {
     type: String,

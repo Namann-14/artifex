@@ -479,22 +479,44 @@ export class GeminiImageService {
     // Simulate processing delay
     await new Promise(resolve => setTimeout(resolve, processingTime));
     
+    // Get dimensions for the aspect ratio
+    const width = this.getWidthFromAspectRatio(request.aspectRatio || '1:1');
+    const height = this.getHeightFromAspectRatio(request.aspectRatio || '1:1');
+    
+    // Generate a seed from the prompt for consistent images
+    const seed = this.generateSeedFromPrompt(request.prompt);
+    
     const images = Array.from({ length: request.batchSize || 1 }, (_, index) => ({
       id: `img_${Date.now()}_${index}`,
-      url: `https://placeholder-image-service.com/${request.aspectRatio}/${request.quality}/${index}`,
-      thumbnailUrl: `https://placeholder-image-service.com/${request.aspectRatio}/${request.quality}/${index}/thumb`,
-      width: this.getWidthFromAspectRatio(request.aspectRatio),
-      height: this.getHeightFromAspectRatio(request.aspectRatio),
-      format: 'webp',
+      // Using picsum.photos for actual working placeholder images
+      url: `https://picsum.photos/seed/${seed + index}/${width}/${height}`,
+      thumbnailUrl: `https://picsum.photos/seed/${seed + index}/${Math.floor(width / 4)}/${Math.floor(height / 4)}`,
+      width,
+      height,
+      format: 'jpg',
       size: Math.floor(Math.random() * 500000) + 100000, // Random size between 100KB - 600KB
       metadata: {
         prompt: request.prompt,
         analysis: analysisText.substring(0, 200),
-        generatedAt: new Date().toISOString()
+        generatedAt: new Date().toISOString(),
+        seed: seed + index
       }
     }));
     
     return { images, processingTime };
+  }
+
+  /**
+   * Generate a consistent seed from prompt
+   */
+  private generateSeedFromPrompt(prompt: string): number {
+    let hash = 0;
+    for (let i = 0; i < prompt.length; i++) {
+      const char = prompt.charCodeAt(i);
+      hash = ((hash << 5) - hash) + char;
+      hash = hash & hash; // Convert to 32-bit integer
+    }
+    return Math.abs(hash) % 10000;
   }
 
   /**
