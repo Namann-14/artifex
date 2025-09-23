@@ -10,6 +10,14 @@ import { Loader } from '@/components/ai-elements/loader';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { 
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Input } from '@/components/ui/input';
+import { 
   Wand2, 
   Image as ImageIcon, 
   RefreshCw, 
@@ -33,6 +41,12 @@ const ChatBotDemo = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
+  
+  // Image generation parameters
+  const [aspectRatio, setAspectRatio] = useState('1:1');
+  const [style, setStyle] = useState('realistic');
+  const [quality, setQuality] = useState('standard');
+  const [negativePrompt, setNegativePrompt] = useState('blurry, low quality, distorted');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -67,10 +81,10 @@ const ChatBotDemo = () => {
         },
         body: JSON.stringify({
           prompt: input.trim(),
-          aspectRatio: '1:1', // Standard square format
-          style: 'realistic',
-          quality: 'standard',
-          negativePrompt: 'blurry, low quality, distorted',
+          aspectRatio,
+          style,
+          quality,
+          negativePrompt: negativePrompt.trim() || undefined,
           seed: Math.floor(Math.random() * 100000)
         }),
       });
@@ -240,13 +254,79 @@ const ChatBotDemo = () => {
           <Card>
             <CardContent className="pt-6">
               <form onSubmit={handleSubmit} className="space-y-4">
-                <Textarea
-                  value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                  placeholder="Describe the image you want to generate... (e.g., 'A majestic mountain landscape at sunset with snow-capped peaks')"
-                  className="min-h-[100px] resize-none"
-                  disabled={loading}
-                />
+                <div>
+                  <Textarea
+                    value={input}
+                    onChange={(e) => setInput(e.target.value)}
+                    placeholder="Describe the image you want to generate... (e.g., 'A majestic mountain landscape at sunset with snow-capped peaks')"
+                    className="min-h-[100px] resize-none"
+                    disabled={loading}
+                  />
+                </div>
+
+                {/* Generation Parameters */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="space-y-2">
+                    <span className="text-sm font-medium">Aspect Ratio</span>
+                    <Select value={aspectRatio} onValueChange={setAspectRatio} disabled={loading}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="1:1">Square (1:1)</SelectItem>
+                        <SelectItem value="16:9">Landscape (16:9)</SelectItem>
+                        <SelectItem value="9:16">Portrait (9:16)</SelectItem>
+                        <SelectItem value="4:3">Classic (4:3)</SelectItem>
+                        <SelectItem value="3:2">Photo (3:2)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <span className="text-sm font-medium">Style</span>
+                    <Select value={style} onValueChange={setStyle} disabled={loading}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="realistic">Realistic</SelectItem>
+                        <SelectItem value="artistic">Artistic</SelectItem>
+                        <SelectItem value="cartoon">Cartoon</SelectItem>
+                        <SelectItem value="anime">Anime</SelectItem>
+                        <SelectItem value="abstract">Abstract</SelectItem>
+                        <SelectItem value="vintage">Vintage</SelectItem>
+                        <SelectItem value="modern">Modern</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <span className="text-sm font-medium">Quality</span>
+                    <Select value={quality} onValueChange={setQuality} disabled={loading}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="standard">Standard</SelectItem>
+                        <SelectItem value="hd">HD</SelectItem>
+                        <SelectItem value="ultra">Ultra</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                {/* Negative Prompt */}
+                <div className="space-y-2">
+                  <span className="text-sm font-medium">What to avoid (Optional)</span>
+                  <Input
+                    value={negativePrompt}
+                    onChange={(e) => setNegativePrompt(e.target.value)}
+                    placeholder="e.g., blurry, low quality, distorted, text, watermark"
+                    disabled={loading}
+                    className="text-sm"
+                  />
+                </div>
+
                 <div className="flex gap-2">
                   <Button 
                     type="submit" 
