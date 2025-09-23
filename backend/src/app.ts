@@ -90,6 +90,9 @@ const limiter = rateLimit({
 });
 app.use('/api', limiter);
 
+// Serve uploaded images statically
+app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
+
 // API routes
 app.use('/api/v1', routes);
 

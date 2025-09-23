@@ -89,7 +89,7 @@ export class ImageGenerationController {
    */
   async textToImage(req: Request, res: Response): Promise<void> {
     try {
-      const { prompt, aspectRatio, style, quality } = req.body;
+      const { prompt, aspectRatio, style, quality, seed, negativePrompt } = req.body;
       const userId = req.auth?.userId || req.user?.id;
 
       if (!userId) {
@@ -124,7 +124,9 @@ export class ImageGenerationController {
         prompt,
         aspectRatio,
         style,
-        quality
+        quality,
+        seed,
+        negativePrompt
       }, (req as any).quotaInfo);
 
       const result = await this.orchestrator.generateTextToImage(context);

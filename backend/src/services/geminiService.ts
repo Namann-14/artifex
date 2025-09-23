@@ -1,5 +1,9 @@
 // @ts-ignore
 import { GoogleGenerativeAI, GenerativeModel, Part, HarmCategory, HarmBlockThreshold } from '@google/generative-ai';
+// Import the new image generation package
+import { GoogleGenAI } from '@google/genai';
+import * as fs from 'node:fs';
+import * as path from 'path';
 import { 
   GeminiGenerationRequest, 
   GeminiGenerationResponse, 
@@ -17,9 +21,10 @@ import { AppError } from '../utils/imageGenerationErrors';
  */
 export class GeminiImageService {
   private genAI: GoogleGenerativeAI;
+  private genAIImage: GoogleGenAI; // New image generation client
   private models: Map<string, GenerativeModel>;
   private readonly defaultModel = 'gemini-2.0-flash-exp';
-  private readonly imageModel = 'gemini-2.0-flash-exp';
+  private readonly imageModel = 'gemini-2.5-flash-image-preview'; // Updated to image generation model
   
   constructor(apiKey?: string) {
     const key = apiKey || process.env.GEMINI_API_KEY;
@@ -33,6 +38,9 @@ export class GeminiImageService {
     }
     
     this.genAI = new GoogleGenerativeAI(key);
+    this.genAIImage = new GoogleGenAI({
+      apiKey: key
+    });
     this.models = new Map();
     this.initializeModels();
   }
@@ -110,29 +118,52 @@ export class GeminiImageService {
    */
   async textToImage(request: GeminiGenerationRequest): Promise<GeminiGenerationResponse> {
     try {
-      const model = this.getModel(request.subscriptionTier, request.quality);
+      const startTime = Date.now();
       
       // Construct enhanced prompt based on parameters
       const enhancedPrompt = this.buildEnhancedPrompt(request);
       
-      console.log('Generating image with Gemini:', {
+      console.log('Generating image with Gemini 2.5 Flash Image Preview:', {
         prompt: enhancedPrompt.substring(0, 100) + '...',
         quality: request.quality,
-        tier: request.subscriptionTier
+        tier: request.subscriptionTier,
+        aspectRatio: request.aspectRatio
       });
 
-      // Since Gemini doesn't directly generate images, we'll use it for content generation
-      // In a real implementation, you'd integrate with an actual image generation service
-      const result = await model.generateContent(enhancedPrompt);
-      const response = await result.response;
-      const generatedText = response.text();
+      // Use the new GoogleGenAI for native image generation
+      const response = await this.genAIImage.models.generateContent({
+        model: this.imageModel,
+        contents: enhancedPrompt,
+      });
 
-      // Mock image generation response (replace with actual image generation logic)
-      const mockImageData = await this.generateMockImageResponse(request, generatedText);
+      const images = [];
+      const processingTime = Date.now() - startTime;
+
+      // Process the response to extract images
+      if (!response.candidates || response.candidates.length === 0) {
+        throw new AppError('No candidates returned from Gemini', 500, 'NO_CANDIDATES');
+      }
+
+      const candidate = response.candidates[0];
+      if (!candidate?.content?.parts) {
+        throw new AppError('No content parts in response', 500, 'NO_CONTENT_PARTS');
+      }
+
+      for (const part of candidate.content.parts) {
+        if (part.inlineData && part.inlineData.data) {
+          // Save the image and create URL
+          const imageData = await this.saveGeneratedImage(part.inlineData.data, request);
+          images.push(imageData);
+        }
+      }
+
+      if (images.length === 0) {
+        throw new AppError('No images were generated', 500, 'NO_IMAGES_GENERATED');
+      }
       
       return {
         success: true,
-        images: mockImageData.images,
+        images,
         metadata: {
           prompt: request.prompt,
           enhancedPrompt,
@@ -141,12 +172,12 @@ export class GeminiImageService {
           aspectRatio: request.aspectRatio,
           ...(request.style && { style: request.style }),
           generatedAt: new Date().toISOString(),
-          processingTime: mockImageData.processingTime,
+          processingTime,
           subscriptionTier: request.subscriptionTier
         },
         usage: {
           creditsUsed: this.calculateCreditsUsed(request),
-          tokensUsed: response.usageMetadata?.totalTokenCount || 0
+          tokensUsed: candidate?.content?.parts?.length || 0
         }
       };
 
@@ -483,8 +514,8 @@ export class GeminiImageService {
     const width = this.getWidthFromAspectRatio(request.aspectRatio || '1:1');
     const height = this.getHeightFromAspectRatio(request.aspectRatio || '1:1');
     
-    // Generate a seed from the prompt for consistent images
-    const seed = this.generateSeedFromPrompt(request.prompt);
+    // Use seed from request or generate from prompt as fallback
+    const seed = request.seed || this.generateSeedFromPrompt(request.prompt);
     
     const images = Array.from({ length: request.batchSize || 1 }, (_, index) => ({
       id: `img_${Date.now()}_${index}`,
@@ -647,6 +678,74 @@ export class GeminiImageService {
     };
     
     return capabilities[tier];
+  }
+
+  /**
+   * Save generated image from base64 data
+   */
+  private async saveGeneratedImage(base64Data: string, request: GeminiGenerationRequest): Promise<any> {
+    try {
+      // Create filename with timestamp and seed
+      const timestamp = Date.now();
+      const filename = `gemini-image-${timestamp}-${request.seed || 'random'}.png`;
+      
+      // Ensure uploads directory exists
+      const uploadsDir = path.join(process.cwd(), 'uploads');
+      if (!fs.existsSync(uploadsDir)) {
+        fs.mkdirSync(uploadsDir, { recursive: true });
+      }
+      
+      // Save image file
+      const filepath = path.join(uploadsDir, filename);
+      const buffer = Buffer.from(base64Data, 'base64');
+      fs.writeFileSync(filepath, buffer);
+      
+      console.log(`Image saved as ${filename}`);
+      
+      // Calculate dimensions based on aspect ratio
+      const { width, height } = this.getDimensionsFromAspectRatio(request.aspectRatio || '1:1');
+      
+      // Return image data structure
+      return {
+        id: `img_${timestamp}`,
+        url: `http://localhost:3001/uploads/${filename}`, // Full URL for serving
+        thumbnailUrl: `http://localhost:3001/uploads/${filename}`, // For now, same as main image
+        width,
+        height,
+        format: 'png',
+        size: buffer.length,
+        metadata: {
+          prompt: request.prompt,
+          seed: request.seed,
+          generatedAt: new Date().toISOString(),
+          filename
+        }
+      };
+    } catch (error) {
+      console.error('Failed to save generated image:', error);
+      throw new AppError('Failed to save generated image', 500, 'IMAGE_SAVE_ERROR');
+    }
+  }
+
+  /**
+   * Get dimensions from aspect ratio
+   */
+  private getDimensionsFromAspectRatio(aspectRatio: string): { width: number; height: number } {
+    const ratios: { [key: string]: { width: number; height: number } } = {
+      '1:1': { width: 1024, height: 1024 },
+      '16:9': { width: 1920, height: 1080 },
+      '9:16': { width: 1080, height: 1920 },
+      '4:3': { width: 1024, height: 768 },
+      '3:2': { width: 1080, height: 720 }
+    };
+    
+    const result = ratios[aspectRatio];
+    if (result) {
+      return result;
+    }
+    
+    // Default fallback
+    return { width: 1024, height: 1024 };
   }
 }
 

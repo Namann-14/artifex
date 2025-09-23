@@ -23,7 +23,8 @@ import {
   RefreshCw, 
   Download,
   Copy,
-  Check 
+  Check,
+  Shuffle
 } from 'lucide-react';
 
 interface Message {
@@ -47,6 +48,8 @@ const ChatBotDemo = () => {
   const [style, setStyle] = useState('realistic');
   const [quality, setQuality] = useState('standard');
   const [negativePrompt, setNegativePrompt] = useState('blurry, low quality, distorted');
+  const [useRandomSeed, setUseRandomSeed] = useState(true);
+  const [customSeed, setCustomSeed] = useState('');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -85,7 +88,9 @@ const ChatBotDemo = () => {
           style,
           quality,
           negativePrompt: negativePrompt.trim() || undefined,
-          seed: Math.floor(Math.random() * 100000)
+          seed: useRandomSeed ? 
+            Math.floor(Math.random() * 1000000) + Date.now() % 100000 : 
+            (parseInt(customSeed) || Math.floor(Math.random() * 1000000))
         }),
       });
 
@@ -325,6 +330,44 @@ const ChatBotDemo = () => {
                     disabled={loading}
                     className="text-sm"
                   />
+                </div>
+
+                {/* Seed Control */}
+                <div className="space-y-2">
+                  <span className="text-sm font-medium">Randomness Control</span>
+                  <div className="flex gap-2 items-center">
+                    <input
+                      type="checkbox"
+                      id="randomSeed"
+                      checked={useRandomSeed}
+                      onChange={(e) => setUseRandomSeed(e.target.checked)}
+                      disabled={loading}
+                      className="h-4 w-4"
+                    />
+                    <label htmlFor="randomSeed" className="text-sm">Always generate different images</label>
+                  </div>
+                  {!useRandomSeed && (
+                    <div className="flex gap-2">
+                      <Input
+                        value={customSeed}
+                        onChange={(e) => setCustomSeed(e.target.value)}
+                        placeholder="Enter custom seed (optional)"
+                        disabled={loading}
+                        className="text-sm flex-1"
+                        type="number"
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setCustomSeed(Math.floor(Math.random() * 1000000).toString())}
+                        disabled={loading}
+                        className="px-3"
+                      >
+                        <Shuffle className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  )}
                 </div>
 
                 <div className="flex gap-2">
