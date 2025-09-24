@@ -2,6 +2,9 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { ClerkProvider } from '@clerk/nextjs';
 import { dark } from '@clerk/themes';
+import { Toaster } from "@/components/ui/sonner";
+import { ThemeProvider } from "@/components/providers/theme-provider";
+import { SmoothScrollProvider } from "@/components/providers/smooth-scroll-provider";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -26,28 +29,33 @@ export default function RootLayout({
 }>) {
   return (
     <ClerkProvider 
-      appearance={{
-        baseTheme: dark,
-        elements: {
-          formButtonPrimary: 'bg-primary hover:bg-primary/90 text-primary-foreground',
-          card: 'bg-card border-border',
-          headerTitle: 'text-foreground',
-          headerSubtitle: 'text-muted-foreground',
-        },
-        variables: {
-          colorPrimary: 'hsl(var(--primary))',
-          colorBackground: 'hsl(var(--background))',
-          colorInputBackground: 'hsl(var(--background))',
-          colorInputText: 'hsl(var(--foreground))',
-        }
-      }}
+      // appearance={{
+      //   baseTheme: dark,
+      //   elements: {
+      //     formButtonPrimary: 'bg-primary hover:bg-primary/90 text-primary-foreground',
+      //     card: 'bg-card border-border',
+      //     headerTitle: 'text-foreground',
+      //     headerSubtitle: 'text-muted-foreground',
+      //   },
+      //   variables: {
+      //     colorPrimary: 'hsl(var(--primary))',
+      //     colorBackground: 'hsl(var(--background))',
+      //     colorInputBackground: 'hsl(var(--background))',
+      //     colorInputText: 'hsl(var(--foreground))',
+      //   }
+      // }}
       publishableKey={process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY}
     >
-      <html lang="en">
+      <html lang="en" suppressHydrationWarning>
         <body
           className={`${geistSans.variable} ${geistMono.variable} antialiased`}
         >
-          {children}
+          <ThemeProvider >
+            <SmoothScrollProvider>
+              {children}
+              <Toaster />
+            </SmoothScrollProvider>
+          </ThemeProvider>
         </body>
       </html>
     </ClerkProvider>
