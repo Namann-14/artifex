@@ -46,7 +46,7 @@ export interface ImageGenerationDocument extends BaseDocument {
 
 // ImageGeneration model interface with static methods
 export interface ImageGenerationModel extends Model<ImageGenerationDocument> {
-  findByUserId(userId: string, limit?: number): Promise<ImageGenerationDocument[]>;
+  findByUserId(userId: string, options?: number | any): Promise<ImageGenerationDocument[] | any>;
   findByStatus(status: ImageGenerationStatus): Promise<ImageGenerationDocument[]>;
   findByType(type: ImageGenerationType): Promise<ImageGenerationDocument[]>;
   findPending(): Promise<ImageGenerationDocument[]>;
@@ -96,6 +96,28 @@ const generatedImageSchema = new Schema({
     required: false,
     trim: true,
     match: [/^https?:\/\/.+/, 'Please provide a valid URL']
+  },
+  publicId: {
+    type: String,
+    required: false,
+    trim: true
+  },
+  secureUrl: {
+    type: String,
+    required: false,
+    trim: true,
+    match: [/^https?:\/\/.+/, 'Please provide a valid URL']
+  },
+  cloudinaryUrl: {
+    type: String,
+    required: false,
+    trim: true,
+    match: [/^https?:\/\/.+/, 'Please provide a valid URL']
+  },
+  bytes: {
+    type: Number,
+    required: false,
+    min: [0, 'Bytes must be non-negative']
   }
 }, { _id: false });
 
@@ -104,7 +126,7 @@ const metadataSchema = new Schema({
   model: {
     type: String,
     required: [true, 'Model is required'],
-    enum: ['dall-e-2', 'dall-e-3', 'stable-diffusion', 'midjourney', 'gemini-2.0-flash-exp']
+    enum: ['dall-e-2', 'dall-e-3', 'stable-diffusion', 'midjourney', 'gemini-2.0-flash-exp', 'gemini-2.5-flash-image-preview']
   },
   version: {
     type: String,
@@ -194,7 +216,7 @@ const imageGenerationSchemaDefinition = {
   modelName: {
     type: String,
     required: [true, 'Model is required'],
-    enum: ['dall-e-2', 'dall-e-3', 'stable-diffusion', 'midjourney', 'gemini-2.0-flash-exp'],
+    enum: ['dall-e-2', 'dall-e-3', 'stable-diffusion', 'midjourney', 'gemini-2.0-flash-exp', 'gemini-2.5-flash-image-preview'],
     default: 'dall-e-3'
   },
   seed: {
@@ -251,7 +273,22 @@ const imageGenerationSchemaDefinition = {
   errorMessage: {
     type: String,
     maxlength: [1000, 'Error message cannot exceed 1000 characters']
-  }
+  },
+  isFavorite: {
+    type: Boolean,
+    default: false,
+    index: true
+  },
+  isPublic: {
+    type: Boolean,
+    default: false,
+    index: true
+  },
+  tags: [{
+    type: String,
+    maxlength: [50, 'Tag cannot exceed 50 characters'],
+    trim: true
+  }]
 };
 
 // Create the image generation schema
@@ -368,11 +405,46 @@ imageGenerationSchema.methods.updateMetadata = async function(
 // Static methods
 imageGenerationSchema.statics.findByUserId = function(
   userId: string, 
-  limit: number = 50
-): Promise<ImageGenerationDocument[]> {
-  return this.find({ userId, isDeleted: false })
-    .sort({ createdAt: -1 })
-    .limit(limit);
+  options: any = {}
+): Promise<any> {
+  if (typeof options === 'number') {
+    // Backward compatibility: if options is a number, treat it as limit
+    return this.find({ userId, isDeleted: false })
+      .sort({ createdAt: -1 })
+      .limit(options);
+  }
+  
+  const {
+    page = 1,
+    limit = 50,
+    type,
+    status,
+    isFavorite,
+    sortBy = 'createdAt',
+    sortOrder = 'desc'
+  } = options;
+
+  const query: any = { userId, isDeleted: false };
+  
+  if (type) query.type = type;
+  if (status) query.status = status;
+  if (isFavorite !== undefined) query.isFavorite = isFavorite;
+
+  const skip = (page - 1) * limit;
+  const sort = { [sortBy]: sortOrder === 'asc' ? 1 : -1 };
+
+  return Promise.all([
+    this.find(query)
+      .sort(sort)
+      .skip(skip)
+      .limit(limit),
+    this.countDocuments(query)
+  ]).then(([generations, total]) => ({
+    generations,
+    total,
+    page,
+    totalPages: Math.ceil(total / limit)
+  }));
 };
 
 imageGenerationSchema.statics.findByStatus = function(status: ImageGenerationStatus): Promise<ImageGenerationDocument[]> {

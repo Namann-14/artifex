@@ -78,9 +78,13 @@ export class ImageGenerationOrchestrator {
           width: img.width,
           height: img.height,
           format: img.format,
-          fileSize: img.size,
+          fileSize: img.size || img.bytes,
           storageKey: img.id,
-          thumbnailUrl: img.thumbnailUrl
+          thumbnailUrl: img.thumbnailUrl,
+          publicId: img.publicId,
+          secureUrl: img.secureUrl,
+          cloudinaryUrl: img.cloudinaryUrl,
+          bytes: img.bytes
         })),
         processingTimeMs: Date.now() - startTime,
         metadata: {
@@ -196,9 +200,13 @@ export class ImageGenerationOrchestrator {
           width: img.width,
           height: img.height,
           format: img.format,
-          fileSize: img.size,
+          fileSize: img.size || img.bytes,
           storageKey: img.id,
-          thumbnailUrl: img.thumbnailUrl
+          thumbnailUrl: img.thumbnailUrl,
+          publicId: img.publicId,
+          secureUrl: img.secureUrl,
+          cloudinaryUrl: img.cloudinaryUrl,
+          bytes: img.bytes
         })),
         processingTimeMs: Date.now() - startTime,
         metadata: {
@@ -327,9 +335,13 @@ export class ImageGenerationOrchestrator {
           width: img.width,
           height: img.height,
           format: img.format,
-          fileSize: img.size,
+          fileSize: img.size || img.bytes,
           storageKey: img.id,
-          thumbnailUrl: img.thumbnailUrl
+          thumbnailUrl: img.thumbnailUrl,
+          publicId: img.publicId,
+          secureUrl: img.secureUrl,
+          cloudinaryUrl: img.cloudinaryUrl,
+          bytes: img.bytes
         })),
         processingTimeMs: Date.now() - startTime,
         metadata: {
@@ -443,9 +455,13 @@ export class ImageGenerationOrchestrator {
           width: img.width,
           height: img.height,
           format: img.format,
-          fileSize: img.size,
+          fileSize: img.size || img.bytes,
           storageKey: img.id,
-          thumbnailUrl: img.thumbnailUrl
+          thumbnailUrl: img.thumbnailUrl,
+          publicId: img.publicId,
+          secureUrl: img.secureUrl,
+          cloudinaryUrl: img.cloudinaryUrl,
+          bytes: img.bytes
         })),
         processingTimeMs: Date.now() - startTime,
         metadata: {
@@ -667,23 +683,106 @@ export class ImageGenerationOrchestrator {
     subscriptionTier: string
   ): Promise<any[]> {
     const processedImages = [];
+    const { cloudinaryService } = await import('./cloudinaryService');
 
     for (const image of images) {
       try {
-        // For now, return the mock images as-is
-        // In a real implementation, you would:
-        // 1. Download the image from the URL
-        // 2. Process it with imageProcessingService
-        // 3. Upload to storage
-        // 4. Generate thumbnails
-        // 5. Return processed URLs
+        let cloudinaryResult = null;
+        
+        // Try to upload to Cloudinary
+        console.log('Processing image for Cloudinary upload. Image URL:', image.url);
+        
+        if (image.data) {
+          // If image has base64 data directly
+          console.log('Found base64 data, uploading to Cloudinary...');
+          const base64Data = `data:image/png;base64,${image.data}`;
+          cloudinaryResult = await cloudinaryService.uploadBase64Image(base64Data, {
+            folder: `artifex/generations/${subscriptionTier}`,
+            quality: 'auto'
+          });
+        } else if (image.url && image.url.includes('localhost')) {
+          // If image is saved locally, read the file and upload to Cloudinary
+          console.log('Found local image URL, reading file for Cloudinary upload...');
+          try {
+            const fs = await import('fs');
+            const path = await import('path');
+            
+            // Extract filename from URL
+            const urlPath = new URL(image.url).pathname;
+            const filename = path.basename(urlPath);
+            const filePath = path.join(process.cwd(), 'uploads', filename);
+            
+            console.log('Reading image file:', filePath);
+            console.log('File exists?', fs.existsSync(filePath));
+            
+            if (fs.existsSync(filePath)) {
+              const imageBuffer = fs.readFileSync(filePath);
+              console.log('Read image buffer, size:', imageBuffer.length);
+              
+              const base64Data = `data:image/png;base64,${imageBuffer.toString('base64')}`;
+              console.log('Converted to base64, length:', base64Data.length);
+              
+              console.log('Uploading to Cloudinary with options:', {
+                folder: `artifex/generations/${subscriptionTier}`,
+                quality: 'auto',
+                format: 'auto'
+              });
+              
+              cloudinaryResult = await cloudinaryService.uploadBase64Image(base64Data, {
+                folder: `artifex/generations/${subscriptionTier}`,
+                quality: 'auto'
+              });
+              
+              console.log('Cloudinary upload completed:', cloudinaryResult);
+            } else {
+              console.log('Local image file not found:', filePath);
+            }
+          } catch (fileError) {
+            console.error('Error reading local image file:', fileError);
+          }
+        } else {
+          console.log('No upload method available for image:', image);
+        }
+        
+        console.log('Cloudinary upload result:', cloudinaryResult);
 
-        processedImages.push({
+        const processedImage = {
           ...image,
-          // Add any processing metadata
+          // Add processing metadata
           processedAt: new Date().toISOString(),
           tier: subscriptionTier
-        });
+        };
+
+        // Add Cloudinary URLs if upload was successful
+        if (cloudinaryResult?.success) {
+          console.log('Setting Cloudinary URLs:', {
+            original: processedImage.url,
+            cloudinary: cloudinaryResult.secureUrl
+          });
+          
+          processedImage.publicId = cloudinaryResult.publicId;
+          processedImage.secureUrl = cloudinaryResult.secureUrl;
+          processedImage.cloudinaryUrl = cloudinaryResult.secureUrl;
+          processedImage.bytes = cloudinaryResult.bytes;
+          processedImage.url = cloudinaryResult.secureUrl; // Use Cloudinary URL as primary URL
+          
+          // Generate thumbnail URL
+          processedImage.thumbnailUrl = cloudinaryService.generateThumbnailUrl(
+            cloudinaryResult.publicId!, 
+            300, 
+            300
+          );
+          
+          console.log('Final processed image URLs:', {
+            url: processedImage.url,
+            secureUrl: processedImage.secureUrl,
+            thumbnailUrl: processedImage.thumbnailUrl
+          });
+        } else {
+          console.log('Cloudinary upload failed or not attempted:', cloudinaryResult);
+        }
+
+        processedImages.push(processedImage);
 
       } catch (error) {
         console.error(`Failed to process image ${image.id}:`, error);

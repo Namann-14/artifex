@@ -45,11 +45,29 @@ interface QuotaData {
   };
 }
 
+interface GenerationHistory {
+  id: string;
+  type: 'text-to-image' | 'image-to-image' | 'multi-image-composition' | 'refine-image';
+  prompt: string;
+  outputImages: Array<{
+    url: string;
+    thumbnailUrl?: string;
+    width: number;
+    height: number;
+    publicId?: string;
+    secureUrl?: string;
+  }>;
+  status: string;
+  createdAt: string;
+  isFavorite: boolean;
+}
+
 export default function DashboardPage() {
   const { user } = useUser();
   const apiClient = useAPIClient();
   const [userData, setUserData] = useState<UserData | null>(null);
   const [quotaData, setQuotaData] = useState<QuotaData | null>(null);
+  const [generationHistory, setGenerationHistory] = useState<GenerationHistory[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -88,6 +106,17 @@ export default function DashboardPage() {
             },
           },
         });
+      }
+
+      // Get generation history
+      try {
+        const historyResponse = await apiClient.getGenerationHistory(1, 6); // Get recent 6 images
+        if (historyResponse && historyResponse.success) {
+          setGenerationHistory(historyResponse.data.generations || []);
+        }
+      } catch (historyError) {
+        console.error('Failed to fetch generation history:', historyError);
+        // Continue without generation history - not critical
       }
 
     } catch (err) {
@@ -284,21 +313,60 @@ export default function DashboardPage() {
                 {/* Recent Activity */}
                 <Card className="md:col-span-2">
                   <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <Clock className="h-5 w-5" />
-                      Recent Activity
+                    <CardTitle className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Clock className="h-5 w-5" />
+                        Recent Generations
+                      </div>
+                      <Button variant="outline" size="sm" asChild>
+                        <a href="/gallery">View All</a>
+                      </Button>
                     </CardTitle>
-                    <CardDescription>Your recent AI generations</CardDescription>
+                    <CardDescription>Your latest AI-generated images</CardDescription>
                   </CardHeader>
                   <CardContent>
-                    <div className="text-center py-8">
-                      <p className="text-muted-foreground">
-                        No recent activity. Start generating images to see your history here.
-                      </p>
-                      <Button className="mt-4" asChild>
-                        <a href="/chat">Start Creating</a>
-                      </Button>
-                    </div>
+                    {generationHistory.length > 0 ? (
+                      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                        {generationHistory.slice(0, 6).map((generation) => (
+                          <div key={generation.id} className="group relative aspect-square overflow-hidden rounded-lg border bg-muted">
+                            {generation.outputImages[0] && (
+                              <img
+                                src={generation.outputImages[0].secureUrl || generation.outputImages[0].thumbnailUrl || generation.outputImages[0].url}
+                                alt={generation.prompt.slice(0, 50) + '...'}
+                                className="w-full h-full object-cover transition-transform group-hover:scale-105"
+                              />
+                            )}
+                            <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-3">
+                              <div className="text-white text-sm">
+                                <p className="font-medium capitalize">
+                                  {generation.type.replace('-', ' ')}
+                                </p>
+                                <p className="text-xs text-white/80 truncate">
+                                  {generation.prompt.slice(0, 40)}...
+                                </p>
+                                <p className="text-xs text-white/60 mt-1">
+                                  {new Date(generation.createdAt).toLocaleDateString()}
+                                </p>
+                              </div>
+                            </div>
+                            {generation.isFavorite && (
+                              <div className="absolute top-2 right-2 w-6 h-6 bg-yellow-500 rounded-full flex items-center justify-center">
+                                <span className="text-white text-xs">★</span>
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-center py-8">
+                        <p className="text-muted-foreground">
+                          No recent activity. Start generating images to see your history here.
+                        </p>
+                        <Button className="mt-4" asChild>
+                          <a href="/chat">Start Creating</a>
+                        </Button>
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
 

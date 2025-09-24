@@ -213,6 +213,11 @@ export interface GeneratedImage {
   fileSize: number;
   storageKey: string;
   thumbnailUrl?: string;
+  // Cloudinary integration
+  publicId?: string;
+  secureUrl?: string;
+  cloudinaryUrl?: string;
+  bytes?: number;
 }
 
 export interface ImageGenerationMetadata {

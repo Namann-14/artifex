@@ -26,6 +26,11 @@ const envSchema = z.object({
   GEMINI_MAX_OUTPUT_TOKENS: z.string().default('8192').transform((val) => parseInt(val, 10)),
   GEMINI_TEMPERATURE: z.string().default('0.9').transform((val) => parseFloat(val)),
   
+  // Cloudinary Configuration (optional)
+  CLOUDINARY_CLOUD_NAME: z.string().optional(),
+  CLOUDINARY_API_KEY: z.string().optional(),
+  CLOUDINARY_API_SECRET: z.string().optional(),
+  
   // Image Generation Configuration
   IMAGE_UPLOAD_MAX_SIZE: z.string().default('10485760').transform((val) => parseInt(val, 10)), // 10MB
   IMAGE_UPLOAD_MAX_FILES: z.string().default('5').transform((val) => parseInt(val, 10)),

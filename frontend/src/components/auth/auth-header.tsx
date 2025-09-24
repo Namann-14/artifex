@@ -31,6 +31,21 @@ export function AuthHeader() {
 
           {/* Navigation & Auth */}
           <div className="flex items-center space-x-4">
+            {/* Navigation Links for Signed In Users */}
+            <SignedIn>
+              <nav className="hidden md:flex items-center space-x-4">
+                <Link href="/chat" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+                  Create
+                </Link>
+                <Link href="/gallery" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+                  Gallery
+                </Link>
+                <Link href="/dashboard" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+                  Dashboard
+                </Link>
+              </nav>
+            </SignedIn>
+
             <SignedOut>
               <div className="flex items-center space-x-2">
                 <SignInButton mode="modal">
@@ -74,6 +89,12 @@ export function AuthHeader() {
                     <Link href="/profile">
                       <User className="mr-2 h-4 w-4" />
                       <span>Profile</span>
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link href="/gallery">
+                      <User className="mr-2 h-4 w-4" />
+                      <span>Gallery</span>
                     </Link>
                   </DropdownMenuItem>
                   <DropdownMenuItem asChild>

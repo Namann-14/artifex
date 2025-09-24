@@ -21,6 +21,11 @@ const startServer = async () => {
     // Connect to MongoDB
     await connectDB();
     
+    // Check Cloudinary configuration
+    const { cloudinaryService } = await import('./services/cloudinaryService');
+    const isCloudinaryReady = cloudinaryService.isReady();
+    logger.info(`☁️ Cloudinary: ${isCloudinaryReady ? 'Ready' : 'Not configured'}`);
+    
     // Start HTTP server
     const server = app.listen(config.PORT, () => {
       logger.info(`🚀 Server running on port ${config.PORT}`);
