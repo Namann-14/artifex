@@ -39,62 +39,7 @@ interface Message {
 }
 
 // Test Upload Component
-const TestUpload = () => {
-  const [uploading, setUploading] = useState(false);
-  const [result, setResult] = useState<string | null>(null);
 
-  const handleTestUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    setUploading(true);
-    setResult(null);
-
-    try {
-      const formData = new FormData();
-      formData.append('testImage', file);
-
-      const response = await fetch('http://localhost:3001/api/test/upload', {
-        method: 'POST',
-        body: formData
-      });
-
-      const data = await response.json();
-      
-      if (data.success) {
-        setResult(`✅ Upload successful! File: ${data.file.filename}`);
-        console.log('Upload result:', data);
-      } else {
-        setResult(`❌ Upload failed: ${data.message}`);
-      }
-    } catch (error) {
-      console.error('Upload error:', error);
-      setResult(`❌ Upload error: ${error}`);
-    } finally {
-      setUploading(false);
-    }
-  };
-
-  return (
-    <Card className="mb-6">
-      <CardHeader>
-        <CardTitle>🧪 Test Upload</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="space-y-4">
-          <Input
-            type="file"
-            accept="image/*"
-            onChange={handleTestUpload}
-            disabled={uploading}
-          />
-          {uploading && <p>Uploading...</p>}
-          {result && <p className="text-sm">{result}</p>}
-        </div>
-      </CardContent>
-    </Card>
-  );
-};
 
 const TestImageToImage = () => {
   const [uploading, setUploading] = useState(false);
@@ -296,17 +241,27 @@ const ChatBotDemo = () => {
       let result;
 
       if (isImageToImage && uploadedImage) {
-        // Use image-to-image generation via API client
+        // Use working direct image-to-image approach
         const formData = new FormData();
         formData.append('sourceImage', uploadedImage);
         formData.append('prompt', input.trim());
-        formData.append('transformationType', style);
-        formData.append('strength', '0.8'); // Default strength
-        if (negativePrompt.trim()) {
-          formData.append('negativePrompt', negativePrompt.trim());
+        
+        console.log('Sending image-to-image request with prompt:', input.trim());
+        
+        const response = await fetch('http://localhost:3001/api/test/image-to-image', {
+          method: 'POST',
+          body: formData,
+        });
+
+        console.log('Response status:', response.status);
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error('Response error:', errorText);
+          throw new Error(`HTTP Error ${response.status}: ${errorText}`);
         }
 
-        result = await APIClient.generateImageToImage(formData, token);
+        result = await response.json();
         console.log('Image-to-Image API Response:', result);
       } else {
         // Use regular text-to-image generation
@@ -372,12 +327,6 @@ const ChatBotDemo = () => {
               Describe the image you want to create and I'll generate it for you
             </p>
           </div>
-
-          {/* Test Upload Component */}
-          <TestUpload />
-          
-          {/* Test Image-to-Image Component */}
-          <TestImageToImage />
 
           {/* Messages Area */}
           <div className="flex-1 overflow-y-auto space-y-4 mb-6">
