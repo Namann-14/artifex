@@ -729,9 +729,12 @@ export interface GeminiGenerationMetadata {
   subscriptionTier: SubscriptionTier;
   inputImageAnalysis?: string;
   inputImageCount?: number;
+  inputImageType?: string;
   compositionAnalysis?: string;
   refinementType?: string;
   refinementAnalysis?: string;
+  fallbackUsed?: boolean;
+  fallbackReason?: string;
 }
 
 export interface GeminiUsageData {

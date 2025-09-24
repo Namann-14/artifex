@@ -12,16 +12,20 @@ interface AuthenticatedRequest extends Request {
   };
 }
 
-// Create uploads directory if it doesn't exist
+// Create uploads and temp directories if they don't exist
 const uploadsDir = path.join(__dirname, '../../uploads');
+const tempDir = path.join(__dirname, '../../public/temp');
 if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir, { recursive: true });
 }
+if (!fs.existsSync(tempDir)) {
+  fs.mkdirSync(tempDir, { recursive: true });
+}
 
-// Configure multer storage
+// Configure multer storage for temporary files
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    cb(null, uploadsDir);
+    cb(null, tempDir); // Store in temp directory
   },
   filename: (req, file, cb) => {
     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
@@ -87,7 +91,7 @@ const createMulterUpload = (req: AuthenticatedRequest) => {
 export const uploadSingleImage = (req: AuthenticatedRequest, res: Response, next: NextFunction): void => {
   try {
     const upload = createMulterUpload(req);
-    const singleUpload = upload.single('image');
+    const singleUpload = upload.single('sourceImage');
 
     singleUpload(req, res, (error) => {
       // use an async IIFE so the Multer callback remains synchronous (returns void)

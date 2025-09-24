@@ -23,7 +23,7 @@ export function ImageGenerationTest() {
       const result = await apiClient.generateTextToImage({
         prompt: 'A beautiful sunset over mountains',
         style: 'realistic',
-        quality: 'high',
+        quality: 'standard',
         dimensions: {
           width: 1024,
           height: 1024,

@@ -38,8 +38,20 @@ router.post('/text-to-image',
  * @access Private
  */
 router.post('/image-to-image',
+  // Add debugging middleware
+  (req, res, next) => {
+    console.log('Image-to-image route hit, Content-Type:', req.get('Content-Type'));
+    console.log('Request body keys:', Object.keys(req.body || {}));
+    next();
+  },
   validateSubscriptionLimits,
   uploadSingleImage,
+  // Add debugging after multer
+  (req, res, next) => {
+    console.log('After multer - body:', Object.keys(req.body || {}));
+    console.log('After multer - file:', req.file ? 'Present' : 'Missing');
+    next();
+  },
   validateRequest(imageToImageSchema),
   cleanupUploadedFiles,
   imageGenerationController.imageToImage.bind(imageGenerationController)

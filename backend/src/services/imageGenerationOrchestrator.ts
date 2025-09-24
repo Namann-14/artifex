@@ -130,7 +130,8 @@ export class ImageGenerationOrchestrator {
   async generateImageToImage(
     context: GenerationContext,
     inputImage: Buffer,
-    inputImageType: string
+    inputImageType: string,
+    tempImagePath?: string
   ): Promise<GenerationResult> {
     const startTime = Date.now();
     let generationRecord: any = null;
@@ -169,12 +170,15 @@ export class ImageGenerationOrchestrator {
       }
 
       // 5. Generate image with Gemini
+      const geminiRequest = {
+        ...context.request,
+        inputImage,
+        inputImageType,
+        ...(tempImagePath && { imagePath: tempImagePath }) // Pass the temporary file path if available
+      };
+      
       const geminiResponse = await this.executeWithRetry(() =>
-        this.geminiService.imageToImage({
-          ...context.request,
-          inputImage,
-          inputImageType
-        })
+        this.geminiService.imageToImage(geminiRequest)
       );
 
       // 6. Process generated images

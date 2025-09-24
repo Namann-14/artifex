@@ -198,11 +198,26 @@ export class ImageGenerationController {
         strength
       }, (req as any).quotaInfo);
 
-      // Read the uploaded image file
+      // Read the uploaded image file and pass the path for Gemini service
       const imageBuffer = fs.readFileSync(sourceImage.path);
       const inputImageType = sourceImage.mimetype;
+      const tempImagePath = sourceImage.path;
 
-      const result = await this.orchestrator.generateImageToImage(context, imageBuffer, inputImageType);
+      let result;
+      try {
+        // Pass the temp image path to the orchestrator for Gemini processing
+        result = await this.orchestrator.generateImageToImage(context, imageBuffer, inputImageType, tempImagePath);
+      } finally {
+        // Clean up the temporary file after processing (success or failure)
+        try {
+          if (fs.existsSync(tempImagePath)) {
+            fs.unlinkSync(tempImagePath);
+            logger.info('Cleaned up temporary image file', { path: tempImagePath });
+          }
+        } catch (cleanupError) {
+          logger.warn('Failed to clean up temporary file', { path: tempImagePath, error: cleanupError });
+        }
+      }
 
       if (!result.success) {
         res.status(400).json({

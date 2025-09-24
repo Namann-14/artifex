@@ -51,9 +51,29 @@ app.use(morgan('combined', {
   }
 }));
 
-// Body parsing middleware with increased limits for image uploads
-app.use(express.json({ limit: '50mb' }));
+// Body parsing middleware - exclude multipart routes from JSON parsing
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+
+// Apply JSON parsing to all routes except image upload routes
+app.use((req: express.Request, res: express.Response, next: express.NextFunction) => {
+  const contentType = req.get('Content-Type') || '';
+  const isMultipartRoute = req.url.includes('/image-to-image') || 
+                          req.url.includes('/multi-image') || 
+                          req.url.includes('/refine');
+  
+  // Skip JSON parsing entirely for multipart routes
+  if (contentType && contentType.includes('multipart/form-data') && isMultipartRoute) {
+    console.log('Skipping JSON parsing for multipart image route:', req.url);
+    return next();
+  }
+  
+  // Apply JSON parsing for all other requests
+  express.json({ limit: '50mb' })(req, res, next);
+});
+
+// Test upload route (before complex middleware)
+import testUploadRoutes from './routes/test-upload';
+app.use('/api/test', testUploadRoutes);
 
 // Static file serving for generated images (optional)
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
@@ -92,6 +112,8 @@ app.use('/api', limiter);
 
 // Serve uploaded images statically
 app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
+
+
 
 // API routes
 app.use('/api/v1', routes);
