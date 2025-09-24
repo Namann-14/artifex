@@ -296,16 +296,16 @@ export default function DashboardPage() {
                         No recent activity. Start generating images to see your history here.
                       </p>
                       <Button className="mt-4" asChild>
-                        <a href="/">Start Creating</a>
+                        <a href="/chat">Start Creating</a>
                       </Button>
                     </div>
                   </CardContent>
                 </Card>
 
-                {/* API Test Component */}
+                {/* API Test Component
                 <div className="md:col-span-3">
                   <ImageGenerationTest />
-                </div>
+                </div> */}
               </div>
             )}
           </div>

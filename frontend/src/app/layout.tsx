@@ -29,21 +29,6 @@ export default function RootLayout({
 }>) {
   return (
     <ClerkProvider 
-      // appearance={{
-      //   baseTheme: dark,
-      //   elements: {
-      //     formButtonPrimary: 'bg-primary hover:bg-primary/90 text-primary-foreground',
-      //     card: 'bg-card border-border',
-      //     headerTitle: 'text-foreground',
-      //     headerSubtitle: 'text-muted-foreground',
-      //   },
-      //   variables: {
-      //     colorPrimary: 'hsl(var(--primary))',
-      //     colorBackground: 'hsl(var(--background))',
-      //     colorInputBackground: 'hsl(var(--background))',
-      //     colorInputText: 'hsl(var(--foreground))',
-      //   }
-      // }}
       publishableKey={process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY}
     >
       <html lang="en" suppressHydrationWarning>
@@ -51,10 +36,10 @@ export default function RootLayout({
           className={`${geistSans.variable} ${geistMono.variable} antialiased`}
         >
           <ThemeProvider >
-            <SmoothScrollProvider>
+            {/* <SmoothScrollProvider> */}
               {children}
               <Toaster />
-            </SmoothScrollProvider>
+            {/* </SmoothScrollProvider> */}
           </ThemeProvider>
         </body>
       </html>

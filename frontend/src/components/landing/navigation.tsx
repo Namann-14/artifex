@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { Button } from '@/components/ui/button'
-import { ThemeToggle } from '@/components/ui/theme-toggle'
+import { ThemeToggle } from '@/components/theme-toggle'
 import { Menu, X, Sparkles, User } from 'lucide-react'
 import { SignInButton, SignUpButton, UserButton, useUser } from '@clerk/nextjs'
 
