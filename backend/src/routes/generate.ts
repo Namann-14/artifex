@@ -26,9 +26,6 @@ router.use(requireAuthentication);
  * @access Private
  */
 router.post('/text-to-image', 
-  // validateSubscriptionLimits,
-  // validateRequest(textToImageSchema),
-  // cleanupUploadedFiles,
   imageGenerationController.textToImage.bind(imageGenerationController)
 );
 

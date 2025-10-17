@@ -197,7 +197,7 @@ export const getUserToken = async (req: Request): Promise<string | null> => {
   }
 };
 
-// Optional authentication middleware (doesn't throw if not authenticated)
+
 export const optionalAuth = (req: Request, res: Response, next: NextFunction) => {
   // Just pass through - user might or might not be authenticated
   next();

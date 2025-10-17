@@ -50,11 +50,7 @@ app.use(morgan('combined', {
     write: (message: string) => logger.info(message.trim())
   }
 }));
-
-// Body parsing middleware - exclude multipart routes from JSON parsing
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
-
-// Apply JSON parsing to all routes except image upload routes
 app.use((req: express.Request, res: express.Response, next: express.NextFunction) => {
   const contentType = req.get('Content-Type') || '';
   const isMultipartRoute = req.url.includes('/image-to-image') || 
