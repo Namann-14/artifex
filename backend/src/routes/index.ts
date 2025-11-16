@@ -3,6 +3,7 @@ import healthRouter from './health';
 import authRouter from './auth';
 import generateRouter from './generate';
 import testCloudinaryRouter from './test-cloudinary';
+import videoRouter from './video';
 
 // Create main router
 const router = Router();
@@ -15,6 +16,9 @@ router.use('/auth', authRouter);
 
 // Image generation routes
 router.use('/generate', generateRouter);
+
+// Video generation routes
+router.use('/video', videoRouter);
 
 // Test routes
 router.use('/test-cloudinary', testCloudinaryRouter);
@@ -34,6 +38,7 @@ router.get('/', (req, res) => {
       health: '/api/v1/health',
       auth: '/api/v1/auth',
       generate: '/api/v1/generate',
+      video: '/api/v1/video',
       // Future endpoints will be listed here
       // users: '/api/v1/users',
       // subscriptions: '/api/v1/subscriptions'

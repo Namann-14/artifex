@@ -20,8 +20,12 @@ const envSchema = z.object({
   JWT_SECRET: z.string().optional(),
   JWT_EXPIRES_IN: z.string().default('7d'),
   
-  // Google Gemini Configuration
-  GEMINI_API_KEY: z.string().min(1, 'GEMINI_API_KEY is required for image generation'),
+  // Freepik API Configuration (Primary image generation service)
+  FREEPIK_API_KEY: z.string().min(1, 'FREEPIK_API_KEY is required for image generation'),
+  FREEPIK_API_URL: z.string().default('https://api.freepik.com/v1/ai/mystic'),
+  
+  // Google Gemini Configuration (Legacy - optional)
+  GEMINI_API_KEY: z.string().optional(),
   GEMINI_MODEL: z.string().default('gemini-2.0-flash-exp'),
   GEMINI_MAX_OUTPUT_TOKENS: z.string().default('8192').transform((val) => parseInt(val, 10)),
   GEMINI_TEMPERATURE: z.string().default('0.9').transform((val) => parseFloat(val)),
@@ -91,6 +95,10 @@ export const appConfig = {
     clerkSecretKey: config.CLERK_SECRET_KEY,
     clerkPublishableKey: config.CLERK_PUBLISHABLE_KEY,
     clerkWebhookSecret: config.CLERK_WEBHOOK_SECRET,
+  },
+  freepik: {
+    apiKey: config.FREEPIK_API_KEY,
+    apiUrl: config.FREEPIK_API_URL,
   },
   gemini: {
     apiKey: config.GEMINI_API_KEY,

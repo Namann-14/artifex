@@ -180,8 +180,12 @@ export class ImageGenerationController {
    */
   async textToImage(req: Request, res: Response): Promise<void> {
     try {
+      console.log('========== TEXT-TO-IMAGE REQUEST RECEIVED ==========');
       const { prompt, aspectRatio, style, quality, seed, negativePrompt } = req.body;
       const userId = req.auth?.userId || req.user?.id;
+
+      console.log('Request body:', { prompt: prompt?.substring(0, 50), aspectRatio, style, quality });
+      console.log('User ID:', userId);
 
       if (!userId) {
         console.log('No userId found in request:', { 
@@ -203,6 +207,8 @@ export class ImageGenerationController {
       const user = await this.ensureUserExists(userId);
       const subscriptionTier = user.subscriptionTier as SubscriptionTier;
 
+      console.log('User subscription tier:', subscriptionTier);
+
       logger.info('Text-to-image generation request', {
         userId,
         prompt: prompt.substring(0, 100),
@@ -220,7 +226,9 @@ export class ImageGenerationController {
         negativePrompt
       }, (req as any).quotaInfo);
 
+      console.log('Calling orchestrator...');
       const result = await this.orchestrator.generateTextToImage(context);
+      console.log('Orchestrator result:', { success: result.success, hasError: !!result.error });
 
       // Save generation history regardless of success/failure
       await this.saveGenerationHistory(
@@ -232,13 +240,16 @@ export class ImageGenerationController {
       );
 
       if (!result.success) {
+        console.log('Generation failed with error:', result.error);
         res.status(400).json({
           success: false,
-          message: result.error?.message || 'Image generation failed'
+          message: result.error?.message || 'Image generation failed',
+          error: result.error
         });
         return;
       }
 
+      console.log('Generation successful, returning response with', result.data?.images?.length, 'images');
       res.status(200).json({
         success: true,
         data: {
@@ -247,12 +258,16 @@ export class ImageGenerationController {
           usage: result.data?.usage
         }
       });
+      console.log('========== TEXT-TO-IMAGE REQUEST COMPLETED ==========');
 
     } catch (error) {
+      console.error('========== TEXT-TO-IMAGE ERROR IN CONTROLLER ==========');
+      console.error('Error:', error);
       logger.error('Text-to-image generation error', error as Error);
       res.status(500).json({
         success: false,
-        message: 'Internal server error during image generation'
+        message: 'Internal server error during image generation',
+        error: error instanceof Error ? error.message : 'Unknown error'
       });
     }
   }
@@ -690,6 +705,89 @@ export class ImageGenerationController {
       res.status(500).json({
         success: false,
         message: 'Internal server error while retrieving quota'
+      });
+    }
+  }
+
+  /**
+   * Generate video from image
+   */
+  async imageToVideo(req: Request, res: Response): Promise<void> {
+    try {
+      console.log('========== IMAGE-TO-VIDEO REQUEST RECEIVED ==========');
+      const { imageUrl, prompt, negativePrompt, duration, cfgScale } = req.body;
+      const userId = req.auth?.userId || req.user?.id;
+
+      console.log('Request body:', { 
+        imageUrl: imageUrl?.substring(0, 50), 
+        prompt: prompt?.substring(0, 50),
+        duration,
+        cfgScale 
+      });
+      console.log('User ID:', userId);
+      console.log('Full request body keys:', Object.keys(req.body));
+
+      if (!userId) {
+        console.log('No userId found in request');
+        res.status(401).json({ 
+          success: false, 
+          message: 'Authentication required - no user ID found' 
+        });
+        return;
+      }
+
+      // Validate required fields
+      if (!imageUrl) {
+        console.error('Missing imageUrl in request');
+        res.status(400).json({
+          success: false,
+          message: 'Image URL is required'
+        });
+        return;
+      }
+
+      // Ensure user exists in database
+      console.log('Ensuring user exists...');
+      const user = await this.ensureUserExists(userId);
+      const subscriptionTier = user.subscriptionTier || 'free';
+
+      console.log('User subscription tier:', subscriptionTier);
+      console.log('Calling orchestrator.generateVideo...');
+
+      // Generate video using Freepik service
+      const result = await this.orchestrator.generateVideo({
+        imageUrl,
+        prompt,
+        negativePrompt,
+        duration: duration || '5',
+        cfgScale: cfgScale || 0.5,
+        subscriptionTier,
+        userId
+      });
+
+      console.log('Video generation result:', { success: result.success, hasVideoUrl: !!result.videoUrl });
+
+      res.status(200).json({
+        success: true,
+        data: result,
+        message: 'Video generated successfully'
+      });
+
+    } catch (error: any) {
+      console.error('========== IMAGE-TO-VIDEO ERROR ==========');
+      console.error('Error name:', error.name);
+      console.error('Error message:', error.message);
+      console.error('Error stack:', error.stack);
+      console.error('Error code:', error.code);
+      console.error('Full error:', error);
+      logger.error('Image-to-video error', error);
+      
+      const statusCode = error.statusCode || 500;
+      res.status(statusCode).json({
+        success: false,
+        message: error.message || 'Failed to generate video',
+        error: error.code || 'VIDEO_GENERATION_ERROR',
+        details: process.env.NODE_ENV === 'development' ? error.stack : undefined
       });
     }
   }

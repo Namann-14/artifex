@@ -23,14 +23,19 @@ export class DatabaseUtils {
     const remaining = Math.max(0, limit - user.monthlyUsage);
     const allowed = remaining >= creditsRequired;
 
-    return {
+    const result: any = {
       allowed,
       remaining,
       limit,
       resetDate: user.quotaResetDate,
-      tier: user.subscriptionTier,
-      reason: allowed ? undefined : 'Insufficient quota remaining'
+      tier: user.subscriptionTier
     };
+    
+    if (!allowed) {
+      result.reason = 'Insufficient quota remaining';
+    }
+    
+    return result;
   }
 
   static async consumeUserQuota(userId: string, credits: number = 1): Promise<void> {
@@ -78,12 +83,19 @@ export class DatabaseUtils {
     const isActive = subscription.isActive() || subscription.isInTrial();
     const hasExpired = subscription.hasExpired();
 
-    return {
+    const result: any = {
       isValid: isActive && !hasExpired,
       subscription: subscription.toJSON(),
-      needsUpgrade: !isActive || hasExpired,
-      reason: !isActive ? 'Subscription not active' : hasExpired ? 'Subscription expired' : undefined
+      needsUpgrade: !isActive || hasExpired
     };
+    
+    if (!isActive) {
+      result.reason = 'Subscription not active';
+    } else if (hasExpired) {
+      result.reason = 'Subscription expired';
+    }
+    
+    return result;
   }
 
   static async upgradeUserSubscription(userId: string, newTier: SubscriptionTier, stripeData?: any): Promise<any> {
@@ -128,11 +140,10 @@ export class DatabaseUtils {
     }
 
     // Create the generation
-    const generation = await ImageGenerationModel.createGeneration({
+    const generationData: any = {
       userId: data.userId,
       type: data.type,
       prompt: data.prompt,
-      negativePrompt: data.negativePrompt,
       style: data.style || 'realistic',
       aspectRatio: data.aspectRatio || '1:1',
       quality: data.quality || 'standard',
@@ -145,7 +156,13 @@ export class DatabaseUtils {
         parameters: data.metadata || {},
         ...data.metadata
       }
-    });
+    };
+    
+    if (data.negativePrompt) {
+      generationData.negativePrompt = data.negativePrompt;
+    }
+    
+    const generation = await ImageGenerationModel.createGeneration(generationData);
 
     return generation;
   }

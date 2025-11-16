@@ -30,7 +30,12 @@ router.get('/test', async (req: Request, res: Response): Promise<void> => {
     
     console.log('Attempting to upload test image to Cloudinary...');
     
-    const uploadResult = await cloudinaryService.uploadBase64Image(testImageBase64, {
+    // Extract base64 data and convert to Buffer
+    const parts = testImageBase64.split(',');
+    const base64Data = parts[1] || '';
+    const imageBuffer = Buffer.from(base64Data, 'base64');
+    
+    const uploadResult = await cloudinaryService.uploadImage(imageBuffer, {
       folder: 'artifex/test',
       publicId: `test-${Date.now()}`
     });

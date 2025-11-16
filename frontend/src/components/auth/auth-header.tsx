@@ -37,6 +37,9 @@ export function AuthHeader() {
                 <Link href="/chat" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
                   Create
                 </Link>
+                <Link href="/video" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+                  Video
+                </Link>
                 <Link href="/gallery" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
                   Gallery
                 </Link>

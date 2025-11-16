@@ -98,4 +98,13 @@ router.get('/quota',
   imageGenerationController.getQuotaStatus.bind(imageGenerationController)
 );
 
+/**
+ * @route POST /api/generate/image-to-video
+ * @description Generate video from image
+ * @access Private
+ */
+router.post('/image-to-video',
+  imageGenerationController.imageToVideo.bind(imageGenerationController)
+);
+
 export default router;

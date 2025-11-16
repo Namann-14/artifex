@@ -97,7 +97,9 @@ export class CloudinaryService {
         public_id: options.publicId,
         format: options.format,
         quality: options.quality || 'auto',
-        transformation: options.transformation
+        transformation: options.transformation,
+        type: 'upload',
+        access_mode: 'public'
       };
 
       // Add dimensions if specified
@@ -152,8 +154,8 @@ export class CloudinaryService {
     }
   }
 
-  public async uploadBase64Image(
-    base64Data: string,
+  public async uploadFromUrl(
+    imageUrl: string,
     options: UploadOptions = {}
   ): Promise<CloudinaryUploadResult> {
     if (!this.isConfigured) {
@@ -170,7 +172,9 @@ export class CloudinaryService {
         public_id: options.publicId,
         format: options.format,
         quality: options.quality || 'auto',
-        transformation: options.transformation
+        transformation: options.transformation,
+        type: 'upload',
+        access_mode: 'public'
       };
 
       // Add dimensions if specified
@@ -185,7 +189,7 @@ export class CloudinaryService {
         }
       });
 
-      const result = await cloudinary.uploader.upload(base64Data, uploadOptions);
+      const result = await cloudinary.uploader.upload(imageUrl, uploadOptions);
 
       logger.info('Base64 image uploaded to Cloudinary successfully', {
         publicId: result.public_id,

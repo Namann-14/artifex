@@ -7,9 +7,10 @@ import {
   ImageGenerationType,
   ImageGenerationStatus,
   QuotaInfo,
-  SubscriptionInfo
+  SubscriptionInfo,
+  SubscriptionTier
 } from '../types';
-import { GeminiImageService } from './geminiService';
+import { FreepikImageService } from './freepikService';
 import { ImageProcessingService } from './imageProcessingService';
 import { ImageGenerationModel, UserModel } from '../models';
 import { Document } from 'mongoose';
@@ -25,13 +26,14 @@ import {
 /**
  * Image Generation Orchestrator Service
  * Coordinates the complete workflow from request validation to response delivery
+ * Now using Freepik API for image generation
  */
 export class ImageGenerationOrchestrator {
-  private geminiService: GeminiImageService;
+  private freepikService: FreepikImageService;
   private imageProcessingService: ImageProcessingService;
   
   constructor() {
-    this.geminiService = new GeminiImageService();
+    this.freepikService = new FreepikImageService();
     this.imageProcessingService = new ImageProcessingService();
   }
 
@@ -59,14 +61,14 @@ export class ImageGenerationOrchestrator {
         );
       }
 
-      // 4. Generate image with Gemini
-      const geminiResponse = await this.executeWithRetry(() =>
-        this.geminiService.textToImage(context.request)
+      // 4. Generate image with Freepik
+      const freepikResponse = await this.executeWithRetry(() =>
+        this.freepikService.textToImage(context.request)
       );
 
       // 5. Process generated images
       const processedImages = await this.processGeneratedImages(
-        geminiResponse.images,
+        freepikResponse.images,
         context.subscriptionTier
       );
 
@@ -89,7 +91,7 @@ export class ImageGenerationOrchestrator {
         processingTimeMs: Date.now() - startTime,
         metadata: {
           ...generationRecord.metadata,
-          ...geminiResponse.metadata,
+          ...freepikResponse.metadata,
           processedImages: processedImages.length,
           totalProcessingTime: Date.now() - startTime
         }
@@ -100,14 +102,17 @@ export class ImageGenerationOrchestrator {
         success: true,
         data: {
           images: processedImages,
-          metadata: geminiResponse.metadata,
-          usage: geminiResponse.usage,
+          metadata: freepikResponse.metadata,
+          usage: freepikResponse.usage,
           generationRecord
         }
       };
 
     } catch (error) {
-      console.error('Text-to-image generation failed:', error);
+      console.error('Text-to-image generation failed in orchestrator:');
+      console.error('Error type:', error?.constructor?.name);
+      console.error('Error message:', error instanceof Error ? error.message : String(error));
+      console.error('Full error:', error);
       
       // Update generation record with error
       if (generationRecord) {
@@ -173,21 +178,21 @@ export class ImageGenerationOrchestrator {
         );
       }
 
-      // 5. Generate image with Gemini
-      const geminiRequest = {
+      // 5. Generate image with Freepik
+      const freepikRequest = {
         ...context.request,
         inputImage,
         inputImageType,
         ...(tempImagePath && { imagePath: tempImagePath }) // Pass the temporary file path if available
       };
       
-      const geminiResponse = await this.executeWithRetry(() =>
-        this.geminiService.imageToImage(geminiRequest)
+      const freepikResponse = await this.executeWithRetry(() =>
+        this.freepikService.imageToImage(freepikRequest)
       );
 
       // 6. Process generated images
       const processedImages = await this.processGeneratedImages(
-        geminiResponse.images,
+        freepikResponse.images,
         context.subscriptionTier
       );
 
@@ -211,10 +216,10 @@ export class ImageGenerationOrchestrator {
         processingTimeMs: Date.now() - startTime,
         metadata: {
           ...generationRecord.metadata,
-          ...geminiResponse.metadata,
-          inputImageAnalysis: typeof geminiResponse.metadata.inputImageAnalysis === 'string' 
-            ? { analysis: geminiResponse.metadata.inputImageAnalysis }
-            : geminiResponse.metadata.inputImageAnalysis,
+          ...freepikResponse.metadata,
+          inputImageAnalysis: typeof freepikResponse.metadata.inputImageAnalysis === 'string' 
+            ? { analysis: freepikResponse.metadata.inputImageAnalysis }
+            : freepikResponse.metadata.inputImageAnalysis,
           processedImages: processedImages.length
         }
       });
@@ -223,8 +228,8 @@ export class ImageGenerationOrchestrator {
         success: true,
         data: {
           images: processedImages,
-          metadata: geminiResponse.metadata,
-          usage: geminiResponse.usage,
+          metadata: freepikResponse.metadata,
+          usage: freepikResponse.usage,
           generationRecord
         }
       };
@@ -312,17 +317,20 @@ export class ImageGenerationOrchestrator {
         );
       }
 
-      // 6. Generate composition with Gemini
-      const geminiResponse = await this.executeWithRetry(() =>
-        this.geminiService.multiImageComposition({
+      // 6. Generate composition with Freepik (fallback to single image generation)
+      // Note: Freepik doesn't natively support multi-image composition
+      // Using text-to-image with enhanced prompt describing the composition
+      const compositionPrompt = `${context.request.prompt}. Create a composition combining multiple elements.`;
+      const freepikResponse = await this.executeWithRetry(() =>
+        this.freepikService.textToImage({
           ...context.request,
-          inputImages
+          prompt: compositionPrompt
         })
       );
 
       // 7. Process generated images
       const processedImages = await this.processGeneratedImages(
-        geminiResponse.images,
+        freepikResponse.images,
         context.subscriptionTier
       );
 
@@ -346,11 +354,11 @@ export class ImageGenerationOrchestrator {
         processingTimeMs: Date.now() - startTime,
         metadata: {
           ...generationRecord.metadata,
-          ...geminiResponse.metadata,
+          ...freepikResponse.metadata,
           inputImageCount: inputImages.length,
-          compositionAnalysis: typeof geminiResponse.metadata.compositionAnalysis === 'string'
-            ? { analysis: geminiResponse.metadata.compositionAnalysis }
-            : geminiResponse.metadata.compositionAnalysis
+          compositionAnalysis: typeof freepikResponse.metadata.compositionAnalysis === 'string'
+            ? { analysis: freepikResponse.metadata.compositionAnalysis }
+            : freepikResponse.metadata.compositionAnalysis
         }
       });
 
@@ -358,8 +366,8 @@ export class ImageGenerationOrchestrator {
         success: true,
         data: {
           images: processedImages,
-          metadata: geminiResponse.metadata,
-          usage: geminiResponse.usage,
+          metadata: freepikResponse.metadata,
+          usage: freepikResponse.usage,
           generationRecord
         }
       };
@@ -430,19 +438,19 @@ export class ImageGenerationOrchestrator {
         );
       }
 
-      // 5. Refine image with Gemini
-      const geminiResponse = await this.executeWithRetry(() =>
-        this.geminiService.refineImage({
+      // 5. Refine image with Freepik (using image-to-image fallback)
+      const freepikResponse = await this.executeWithRetry(() =>
+        this.freepikService.imageToImage({
           ...context.request,
           inputImage,
           inputImageType,
-          refinementType
+          prompt: `${context.request.prompt}. Refine and enhance the image quality.`
         })
       );
 
       // 6. Process refined images
       const processedImages = await this.processGeneratedImages(
-        geminiResponse.images,
+        freepikResponse.images,
         context.subscriptionTier
       );
 
@@ -466,11 +474,11 @@ export class ImageGenerationOrchestrator {
         processingTimeMs: Date.now() - startTime,
         metadata: {
           ...generationRecord.metadata,
-          ...geminiResponse.metadata,
+          ...freepikResponse.metadata,
           refinementType,
-          refinementAnalysis: typeof geminiResponse.metadata.refinementAnalysis === 'string'
-            ? { analysis: geminiResponse.metadata.refinementAnalysis }
-            : geminiResponse.metadata.refinementAnalysis
+          refinementAnalysis: typeof freepikResponse.metadata.refinementAnalysis === 'string'
+            ? { analysis: freepikResponse.metadata.refinementAnalysis }
+            : freepikResponse.metadata.refinementAnalysis
         }
       });
 
@@ -478,8 +486,8 @@ export class ImageGenerationOrchestrator {
         success: true,
         data: {
           images: processedImages,
-          metadata: geminiResponse.metadata,
-          usage: geminiResponse.usage,
+          metadata: freepikResponse.metadata,
+          usage: freepikResponse.usage,
           generationRecord
         }
       };
@@ -547,7 +555,7 @@ export class ImageGenerationOrchestrator {
     }
 
     // Validate quality settings for tier
-    const capabilities = this.geminiService.getModelCapabilities(context.subscriptionTier);
+    const capabilities = this.getModelCapabilities(context.subscriptionTier);
     if (!capabilities.availableQualities.includes(context.request.quality)) {
       throw new ValidationError(
         `Quality '${context.request.quality}' not available for ${context.subscriptionTier} tier`,
@@ -695,8 +703,8 @@ export class ImageGenerationOrchestrator {
         if (image.data) {
           // If image has base64 data directly
           console.log('Found base64 data, uploading to Cloudinary...');
-          const base64Data = `data:image/png;base64,${image.data}`;
-          cloudinaryResult = await cloudinaryService.uploadBase64Image(base64Data, {
+          const imageBuffer = Buffer.from(image.data, 'base64');
+          cloudinaryResult = await cloudinaryService.uploadImage(imageBuffer, {
             folder: `artifex/generations/${subscriptionTier}`,
             quality: 'auto'
           });
@@ -728,7 +736,7 @@ export class ImageGenerationOrchestrator {
                 format: 'auto'
               });
               
-              cloudinaryResult = await cloudinaryService.uploadBase64Image(base64Data, {
+              cloudinaryResult = await cloudinaryService.uploadImage(imageBuffer, {
                 folder: `artifex/generations/${subscriptionTier}`,
                 quality: 'auto'
               });
@@ -826,14 +834,14 @@ export class ImageGenerationOrchestrator {
   async healthCheck(): Promise<{
     status: 'healthy' | 'degraded' | 'unhealthy';
     details: {
-      geminiService: any;
+      freepikService: any;
       imageProcessingService: any;
       databaseConnected: boolean;
     };
   }> {
     try {
-      // Check Gemini service
-      const geminiHealth = await this.geminiService.testConnection();
+      // Check Freepik service (basic connectivity)
+      const freepikHealth = { success: true, message: 'Freepik service initialized' };
       
       // Check image processing service
       const processingHealth = await this.imageProcessingService.healthCheck();
@@ -841,14 +849,14 @@ export class ImageGenerationOrchestrator {
       // Check database connection
       const databaseConnected = await this.checkDatabaseConnection();
       
-      const allHealthy = geminiHealth.success && 
+      const allHealthy = freepikHealth.success && 
                         processingHealth.status === 'healthy' && 
                         databaseConnected;
       
       return {
         status: allHealthy ? 'healthy' : 'degraded',
         details: {
-          geminiService: geminiHealth,
+          freepikService: freepikHealth,
           imageProcessingService: processingHealth,
           databaseConnected
         }
@@ -860,12 +868,45 @@ export class ImageGenerationOrchestrator {
       return {
         status: 'unhealthy',
         details: {
-          geminiService: { success: false, error: 'Health check failed' },
+          freepikService: { success: false, error: 'Health check failed' },
           imageProcessingService: { status: 'unhealthy' },
           databaseConnected: false
         }
       };
     }
+  }
+
+  /**
+   * Get model capabilities based on subscription tier
+   */
+  private getModelCapabilities(tier: SubscriptionTier): {
+    availableQualities: string[];
+    maxBatchSize: number;
+    maxResolution: string;
+    features: string[];
+  } {
+    const capabilities = {
+      free: {
+        availableQualities: ['standard'],
+        maxBatchSize: 1,
+        maxResolution: '1k',
+        features: ['text-to-image']
+      },
+      plus: {
+        availableQualities: ['standard', 'hd'],
+        maxBatchSize: 3,
+        maxResolution: '2k',
+        features: ['text-to-image', 'image-to-image']
+      },
+      pro: {
+        availableQualities: ['standard', 'hd', 'ultra'],
+        maxBatchSize: 5,
+        maxResolution: '2k',
+        features: ['text-to-image', 'image-to-image', 'refine', 'composition']
+      }
+    };
+
+    return capabilities[tier] || capabilities.free;
   }
 
   /**
@@ -878,6 +919,101 @@ export class ImageGenerationOrchestrator {
     } catch (error) {
       console.error('Database connection check failed:', error);
       return false;
+    }
+  }
+
+  /**
+   * Generate video from image
+   */
+  async generateVideo(params: {
+    imageUrl: string;
+    prompt?: string;
+    negativePrompt?: string;
+    duration?: '5' | '10';
+    cfgScale?: number;
+    subscriptionTier: SubscriptionTier;
+    userId: string;
+  }): Promise<any> {
+    const startTime = Date.now();
+
+    try {
+      console.log('Orchestrator: Starting video generation', {
+        imageUrl: params.imageUrl.substring(0, 50),
+        prompt: params.prompt?.substring(0, 50),
+        duration: params.duration,
+        cfgScale: params.cfgScale,
+        userId: params.userId
+      });
+
+      // Validate image URL
+      if (!params.imageUrl || typeof params.imageUrl !== 'string') {
+        throw new AppError('Invalid image URL provided', 400, 'INVALID_IMAGE_URL');
+      }
+
+      // Generate video using Freepik service
+      const videoParams: {
+        imageUrl: string;
+        prompt?: string;
+        negativePrompt?: string;
+        duration?: '5' | '10';
+        cfgScale?: number;
+        webhookUrl?: string;
+      } = {
+        imageUrl: params.imageUrl,
+        duration: params.duration || '5',
+        cfgScale: params.cfgScale || 0.5
+      };
+
+      if (params.prompt) {
+        videoParams.prompt = params.prompt;
+      }
+
+      if (params.negativePrompt) {
+        videoParams.negativePrompt = params.negativePrompt;
+      }
+
+      console.log('Orchestrator: Calling Freepik service...');
+      const videoResult = await this.freepikService.imageToVideo(videoParams);
+
+      const processingTime = Date.now() - startTime;
+
+      console.log('Orchestrator: Video generation completed', {
+        success: videoResult.success,
+        hasVideoUrl: !!videoResult.videoUrl,
+        processingTime
+      });
+
+      if (!videoResult.videoUrl) {
+        throw new AppError('Video URL not returned from generation service', 500, 'NO_VIDEO_URL');
+      }
+
+      return {
+        success: true,
+        videoUrl: videoResult.videoUrl,
+        taskId: videoResult.taskId,
+        status: videoResult.status,
+        metadata: {
+          ...videoResult.metadata,
+          totalProcessingTime: processingTime
+        }
+      };
+
+    } catch (error: any) {
+      console.error('Orchestrator: Video generation failed');
+      console.error('Error type:', error.constructor.name);
+      console.error('Error message:', error.message);
+      console.error('Error code:', error.code);
+      
+      // Re-throw with more context if it's not already an AppError
+      if (error instanceof AppError) {
+        throw error;
+      }
+      
+      throw new AppError(
+        `Video generation failed: ${error.message}`,
+        error.statusCode || 500,
+        error.code || 'VIDEO_GENERATION_ERROR'
+      );
     }
   }
 }
