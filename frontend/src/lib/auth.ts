@@ -2,7 +2,7 @@ import { auth } from '@clerk/nextjs/server';
 
 // API communication utilities for authenticated requests
 export class AuthAPI {
-  private static baseURL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api/v1';
+  private static baseURL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
 
   // Get authentication headers with Clerk token
   static async getAuthHeaders(): Promise<Record<string, string>> {

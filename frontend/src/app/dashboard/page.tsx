@@ -11,7 +11,6 @@ import { Button } from '@/components/ui/button';
 import { Loader } from '@/components/ai-elements/loader';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { RefreshCw, Image, Zap, Clock } from 'lucide-react';
-import { ImageGenerationTest } from '@/components/test/image-generation-test';
 
 interface UserData {
   user: {

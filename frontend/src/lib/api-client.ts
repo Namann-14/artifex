@@ -4,7 +4,7 @@ import { useAuth } from '@clerk/nextjs';
 
 // API client for backend communication
 export class APIClient {
-  private static baseURL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api/v1';
+  private static baseURL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
 
   // Make a generic request with optional authentication
   private static async makeRequest(

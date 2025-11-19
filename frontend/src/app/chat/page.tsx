@@ -60,7 +60,7 @@ const TestImageToImage = () => {
 
       console.log('Sending image-to-image request with prompt:', prompt);
       
-      const response = await fetch('http://localhost:3001/api/test/image-to-image', {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1'}/test/image-to-image`, {
         method: 'POST',
         body: formData,
       });
@@ -248,7 +248,7 @@ const ChatBotDemo = () => {
         
         console.log('Sending image-to-image request with prompt:', input.trim());
         
-        const response = await fetch('http://localhost:3001/api/test/image-to-image', {
+        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1'}/test/image-to-image`, {
           method: 'POST',
           body: formData,
         });
@@ -265,7 +265,7 @@ const ChatBotDemo = () => {
         console.log('Image-to-Image API Response:', result);
       } else {
         // Use regular text-to-image generation
-        const response = await fetch('http://localhost:3001/api/v1/generate/text-to-image', {
+        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1'}/generate/text-to-image`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',

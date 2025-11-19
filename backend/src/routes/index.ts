@@ -2,7 +2,6 @@ import { Router } from 'express';
 import healthRouter from './health';
 import authRouter from './auth';
 import generateRouter from './generate';
-import testCloudinaryRouter from './test-cloudinary';
 import videoRouter from './video';
 
 // Create main router
@@ -19,9 +18,6 @@ router.use('/generate', generateRouter);
 
 // Video generation routes
 router.use('/video', videoRouter);
-
-// Test routes
-router.use('/test-cloudinary', testCloudinaryRouter);
 
 // Future route modules will be mounted here
 // router.use('/users', usersRouter);

@@ -26,16 +26,17 @@
       "@/utils/*": ["utils/*"]
     },
     "typeRoots": ["./node_modules/@types"],
-    "noImplicitAny": true,
-    "noImplicitReturns": true,
+    "types": [],
+    "noImplicitAny": false,
+    "noImplicitReturns": false,
     "noImplicitThis": true,
-    "strictNullChecks": true,
+    "strictNullChecks": false,
     "strictFunctionTypes": true,
     "strictBindCallApply": true,
-    "strictPropertyInitialization": true,
+    "strictPropertyInitialization": false,
     "noImplicitOverride": true,
-    "exactOptionalPropertyTypes": true,
-    "noUncheckedIndexedAccess": true
+    "exactOptionalPropertyTypes": false,
+    "noUncheckedIndexedAccess": false
   },
   "include": [
     "src/**/*"

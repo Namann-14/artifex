@@ -136,7 +136,7 @@ export default function VideoGenerationPage() {
       setGenerationStatus('Generating video... This may take 1-2 minutes.');
 
       // Generate video
-      const response = await fetch('http://localhost:3001/api/v1/generate/image-to-video', {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1'}/generate/image-to-video`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,

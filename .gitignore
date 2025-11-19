@@ -1,0 +1,45 @@
+# .env
+.env.local
+.env.*.local
+
+# Dependencies
+node_modules/
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# Build outputs
+dist/
+build/
+.next/
+out/
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Docker
+docker-compose.override.yml
+
+# Backend specific
+backend/uploads/*
+!backend/uploads/.gitkeep
+backend/public/temp/*
+!backend/public/temp/.gitkeep
+backend/temp/
+backend/storage/
+
+# Frontend specific
+frontend/.next/
+frontend/out/

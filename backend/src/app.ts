@@ -67,10 +67,6 @@ app.use((req: express.Request, res: express.Response, next: express.NextFunction
   express.json({ limit: '50mb' })(req, res, next);
 });
 
-// Test upload route (before complex middleware)
-import testUploadRoutes from './routes/test-upload';
-app.use('/api/test', testUploadRoutes);
-
 // Static file serving for generated images (optional)
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
