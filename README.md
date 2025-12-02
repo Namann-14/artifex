@@ -16,19 +16,23 @@
 
 ## 📸 Screenshots
 
+
 <div align="center">
-  <img src="https://via.placeholder.com/800x450?text=Dashboard+Preview" alt="Dashboard Screenshot" width="800"/>
+<img width="1280" height="671" alt="artifex landing" src="https://github.com/user-attachments/assets/8a34101e-7cc7-4738-a8a4-5790de018f1f" />
+  <br/>
+  <em>Advanced Image Generation Studio</em>
+</div>
+<div align="center">
+
+  <img width="1280" height="669" alt="dashboard" src="https://github.com/user-attachments/assets/d781f596-9263-4510-a8db-e8c1ce6611ba" />
   <br/>
   <em>Interactive AI Dashboard</em>
 </div>
 
 <br/>
 
-<div align="center">
-  <img src="https://via.placeholder.com/800x450?text=Image+Generation+Preview" alt="Image Generation" width="800"/>
-  <br/>
-  <em>Advanced Image Generation Studio</em>
-</div>
+
+
 
 ---
 
@@ -38,7 +42,6 @@ If you're a recruiter or collaborator, feel free to reach out:
 
 🌐 **Portfolio:** [namannayak.me](https://namannayak.me)  
 💼 **LinkedIn:** [linkedin.com/in/naman-nayak14](https://www.linkedin.com/in/naman-nayak14/)  
-📧 **Email:** [namannayak.18@gmail.com](mailto:namannayak.18@gmail.com)
 
 ---
 
