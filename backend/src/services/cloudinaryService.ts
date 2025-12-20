@@ -84,11 +84,29 @@ export class CloudinaryService {
     options: UploadOptions = {}
   ): Promise<CloudinaryUploadResult> {
     if (!this.isConfigured) {
+      const errorMsg = 'Cloudinary is not configured. Please check CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, and CLOUDINARY_API_SECRET environment variables.';
+      logger.error(errorMsg);
       return {
         success: false,
-        error: 'Cloudinary is not configured. Please check environment variables.'
+        error: errorMsg
       };
     }
+
+    // Validate buffer
+    if (!imageBuffer || imageBuffer.length === 0) {
+      const errorMsg = 'Invalid image buffer: buffer is empty';
+      logger.error(errorMsg);
+      return {
+        success: false,
+        error: errorMsg
+      };
+    }
+
+    logger.info('Uploading image to Cloudinary', {
+      bufferSize: imageBuffer.length,
+      sizeInKB: (imageBuffer.length / 1024).toFixed(2),
+      folder: options.folder
+    });
 
     try {
       const uploadOptions: any = {
@@ -114,25 +132,40 @@ export class CloudinaryService {
         }
       });
 
+      logger.info('Cloudinary upload options', uploadOptions);
+
       const result = await new Promise((resolve, reject) => {
-        cloudinary.uploader.upload_stream(
+        const uploadStream = cloudinary.uploader.upload_stream(
           uploadOptions,
           (error, result) => {
             if (error) {
+              logger.error('Cloudinary upload_stream error', {
+                error: error,
+                message: error.message,
+                http_code: error.http_code
+              });
               reject(error);
             } else {
+              logger.info('Cloudinary upload_stream success', {
+                publicId: result?.public_id,
+                url: result?.secure_url
+              });
               resolve(result);
             }
           }
-        ).end(imageBuffer);
+        );
+        uploadStream.end(imageBuffer);
       });
 
       const uploadResult = result as any;
 
-      logger.info('Image uploaded to Cloudinary successfully', {
+      logger.info('✅ Image uploaded to Cloudinary successfully', {
         publicId: uploadResult.public_id,
+        secureUrl: uploadResult.secure_url,
         bytes: uploadResult.bytes,
-        format: uploadResult.format
+        format: uploadResult.format,
+        width: uploadResult.width,
+        height: uploadResult.height
       });
 
       return {
@@ -146,7 +179,12 @@ export class CloudinaryService {
       };
 
     } catch (error) {
-      logger.error('Failed to upload image to Cloudinary', error as Error);
+      const errorDetails = {
+        message: error instanceof Error ? error.message : String(error),
+        error: error,
+        stack: error instanceof Error ? error.stack : undefined
+      };
+      logger.error('❌ Failed to upload image to Cloudinary', errorDetails);
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Failed to upload image'

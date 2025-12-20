@@ -31,6 +31,18 @@ const app = express();
 // Trust proxy for rate limiting behind reverse proxies
 app.set('trust proxy', 1);
 
+// ====== DEBUG: Log EVERY incoming request FIRST ======
+app.use((req, res, next) => {
+  console.log('='.repeat(80));
+  console.log(`🔵 INCOMING REQUEST: ${req.method} ${req.url}`);
+  console.log(`   Origin: ${req.get('origin') || 'No origin header'}`);
+  console.log(`   Content-Type: ${req.get('content-type') || 'No content-type'}`);
+  console.log(`   Authorization: ${req.get('authorization') ? 'Present' : 'Missing'}`);
+  console.log(`   Remote Address: ${req.ip}`);
+  console.log('='.repeat(80));
+  next();
+});
+
 // Security middleware
 app.use(helmet({
   crossOriginResourcePolicy: { policy: 'cross-origin' }

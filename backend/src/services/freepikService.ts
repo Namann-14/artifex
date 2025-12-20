@@ -433,12 +433,12 @@ export class FreepikImageService {
       const startTime = Date.now();
       const videoApiUrl = 'https://api.freepik.com/v1/ai/image-to-video/kling-v2-5-pro';
       
-      console.log('Generating video with Freepik Kling API:', {
+      console.log('🎬 Generating video with Freepik Kling API:', {
         imageUrl: params.imageUrl.substring(0, 100) + '...',
         prompt: params.prompt?.substring(0, 100),
         duration: params.duration || '5',
         cfgScale: params.cfgScale,
-        apiKey: this.apiKey ? `${this.apiKey.substring(0, 10)}...` : 'MISSING'
+        apiKey: this.apiKey ? `${this.apiKey.substring(0, 10)}... (length: ${this.apiKey.length})` : '❌ MISSING'
       });
 
       // Validate API key
@@ -447,6 +447,26 @@ export class FreepikImageService {
           'Freepik API key is not configured. Please check your environment variables.',
           500,
           'MISSING_API_KEY'
+        );
+      }
+
+      // Check for common API key issues
+      if (this.apiKey.includes('"') || this.apiKey.includes("'")) {
+        console.error('⚠️  API key contains quotes! This will cause authentication to fail.');
+        console.error('Remove quotes from FREEPIK_API_KEY in your .env file');
+        throw new AppError(
+          'Invalid API key format detected. Remove quotes from FREEPIK_API_KEY in .env file.',
+          500,
+          'INVALID_API_KEY_FORMAT'
+        );
+      }
+
+      if (this.apiKey.length < 30) {
+        console.error('⚠️  API key seems too short. Expected length ~40+ characters');
+        throw new AppError(
+          'Invalid API key format. Please check your Freepik API key.',
+          500,
+          'INVALID_API_KEY_FORMAT'
         );
       }
 
@@ -470,11 +490,11 @@ export class FreepikImageService {
           
           const uploadResult = await cloudinaryService.uploadImage(imageBuffer, {
             folder: 'artifex/video-sources',
-            quality: '100',  // Use highest quality
-            format: 'jpg',    // Ensure JPG format
-            width: 1024,      // Minimum width for Freepik
-            height: 1024,     // Minimum height for Freepik
-            crop: 'pad'       // Pad to maintain aspect ratio
+            quality: 'auto:best',  // Use best quality
+            format: 'jpg',         // Ensure JPG format
+            transformation: [
+              { width: 1024, height: 1024, crop: 'fill', gravity: 'auto' }  // Ensure proper dimensions
+            ]
           });
 
           if (!uploadResult || !uploadResult.success || !uploadResult.secureUrl) {
@@ -483,8 +503,9 @@ export class FreepikImageService {
 
           // Use direct Cloudinary URL - it's already public and optimized
           imageToSend = uploadResult.secureUrl;
-          console.log('Base64 image uploaded to Cloudinary:', imageToSend);
+          console.log('✅ Base64 image uploaded to Cloudinary:', imageToSend);
         } catch (error: any) {
+          console.error('❌ Cloudinary upload error:', error);
           throw new AppError(
             `Failed to process base64 image: ${error.message}`,
             500,
@@ -568,25 +589,29 @@ export class FreepikImageService {
         requestPayload.webhook_url = params.webhookUrl;
       }
 
-      console.log('Freepik video request payload:', JSON.stringify({
+      console.log('📤 Freepik video request payload:', JSON.stringify({
         ...requestPayload,
         image: requestPayload.image.length > 100 ? 
           requestPayload.image.substring(0, 100) + `... (${requestPayload.image.length} chars)` : 
           requestPayload.image
       }, null, 2));
 
+      console.log('🔑 Using API key:', `${this.apiKey.substring(0, 15)}...${this.apiKey.substring(this.apiKey.length - 5)}`);
+      console.log('🌐 API endpoint:', videoApiUrl);
+
       // Make API request to Freepik
       const response = await fetch(videoApiUrl, {
         method: 'POST',
         headers: {
           'x-freepik-api-key': this.apiKey,
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
         },
         body: JSON.stringify(requestPayload)
       });
 
-      console.log('Freepik video API response status:', response.status, response.statusText);
-      console.log('Response headers:', Object.fromEntries(response.headers.entries()));
+      console.log('📥 Freepik video API response status:', response.status, response.statusText);
+      console.log('📋 Response headers:', Object.fromEntries(response.headers.entries()));
 
       if (!response.ok) {
         const errorText = await response.text();
@@ -714,36 +739,55 @@ export class FreepikImageService {
         };
       } else if (data.status === 'FAILED' || data.status === 'failed') {
         // Log full error data for debugging
-        console.error('Video generation FAILED. Full error data:', JSON.stringify(data, null, 2));
-        console.error('Task ID:', taskId);
-        console.error('You may check this task directly at Freepik dashboard');
+        console.error('❌ Video generation FAILED. Full error data:', JSON.stringify(data, null, 2));
+        console.error('❌ Task ID:', taskId);
+        console.error('⚠️  Check this task at: https://www.freepik.com/api/dashboard');
         
         // Try to get more detailed error information
         let errorMessage = '';
+        let errorDetails: string[] = [];
         
         if (data.error) {
-          errorMessage = `Video generation failed: ${data.error}`;
-        } else if (data.error_message) {
-          errorMessage = `Video generation failed: ${data.error_message}`;
-        } else if (data.message) {
-          errorMessage = `Video generation failed: ${data.message}`;
-        } else if (data.errors && Array.isArray(data.errors)) {
-          errorMessage = `Video generation failed: ${data.errors.join(', ')}`;
+          errorDetails.push(`Error: ${data.error}`);
+        }
+        if (data.error_message) {
+          errorDetails.push(`Error Message: ${data.error_message}`);
+        }
+        if (data.message && data.message !== data.error) {
+          errorDetails.push(`Message: ${data.message}`);
+        }
+        if (data.errors && Array.isArray(data.errors)) {
+          errorDetails.push(`Errors: ${data.errors.join(', ')}`);
         } else if (data.errors && typeof data.errors === 'object') {
-          errorMessage = `Video generation failed: ${JSON.stringify(data.errors)}`;
+          errorDetails.push(`Errors: ${JSON.stringify(data.errors)}`);
+        }
+        if (data.reason) {
+          errorDetails.push(`Reason: ${data.reason}`);
+        }
+        
+        if (errorDetails.length > 0) {
+          errorMessage = `Video generation failed: ${errorDetails.join(' | ')}`;
         } else {
           // No error details provided - give helpful message
-          errorMessage = 'Video generation failed. Common reasons:\n\n' +
-                         '1. API Credits/Quota: Your Freepik API plan may be out of credits\n' +
-                         '   → Check your account at https://www.freepik.com/api/dashboard\n\n' +
-                         '2. Image Requirements: The image may not meet requirements\n' +
-                         '   → Try: Standard format (JPG/PNG), clear quality, 512x512 to 2048x2048px\n' +
-                         '   → Avoid: Blurry, overly compressed, or inappropriate content\n\n' +
-                         '3. Prompt Issues: The prompt may contain restricted content\n' +
-                         '   → Try: Simpler, descriptive prompts without sensitive terms\n\n' +
-                         '4. API Permissions: Your API key may not have video generation access\n' +
-                         '   → Verify your subscription includes Kling video generation\n\n' +
-                         `Task ID for support: ${taskId}`;
+          errorMessage = 
+            '🚫 Video generation failed. Common causes:\n\n' +
+            '1️⃣ API Key Issues:\n' +
+            '   • Invalid or expired API key\n' +
+            '   • API key not authorized for video generation\n' +
+            '   → Solution: Verify your Freepik API key at https://www.freepik.com/api/dashboard\n\n' +
+            '2️⃣ Quota/Credits:\n' +
+            '   • Out of API credits or daily limit reached\n' +
+            '   • Subscription tier doesn\'t include Kling video\n' +
+            '   → Solution: Check your usage and upgrade plan if needed\n\n' +
+            '3️⃣ Image Quality:\n' +
+            '   • Image resolution too low (< 512px) or too high (> 2048px)\n' +
+            '   • Image is blurry, corrupted, or invalid format\n' +
+            '   → Solution: Use clear JPG/PNG images, 1024x1024px recommended\n\n' +
+            '4️⃣ Content Policy:\n' +
+            '   • Image or prompt contains restricted/inappropriate content\n' +
+            '   → Solution: Use safe, appropriate content only\n\n' +
+            `📋 Task ID: ${taskId}\n` +
+            '💡 Tip: Check Freepik API dashboard for detailed error logs';
         }
         
         throw new AppError(

@@ -4,6 +4,8 @@ import { logger } from '../utils/logger';
 import { SubscriptionTier } from '../types';
 import { UserModel } from '../models/User';
 import { ImageGenerationModel } from '../models/ImageGeneration';
+import { addImageGenerationJob, addVideoGenerationJob, getJobStatus } from '../services/jobQueue';
+import { v4 as uuid } from 'uuid';
 import fs from 'fs';
 
 export class ImageGenerationController {
@@ -788,6 +790,162 @@ export class ImageGenerationController {
         message: error.message || 'Failed to generate video',
         error: error.code || 'VIDEO_GENERATION_ERROR',
         details: process.env.NODE_ENV === 'development' ? error.stack : undefined
+      });
+    }
+  }
+
+  /**
+   * Queue text-to-image generation job (async with real-time progress)
+   */
+  async textToImageAsync(req: Request, res: Response): Promise<void> {
+    try {
+      const { prompt, aspectRatio, style, quality, seed, negativePrompt } = req.body;
+      const userId = req.auth?.userId || req.user?.id;
+
+      if (!userId) {
+        res.status(401).json({ 
+          success: false, 
+          message: 'Authentication required' 
+        });
+        return;
+      }
+
+      const user = await this.ensureUserExists(userId);
+      const subscriptionTier = user.subscriptionTier as SubscriptionTier;
+
+      // Generate unique job ID
+      const jobId = `img-${uuid()}`;
+
+      // Queue the job
+      await addImageGenerationJob({
+        jobId,
+        userId,
+        type: 'text-to-image',
+        prompt,
+        parameters: {
+          aspectRatio,
+          style,
+          quality,
+          negativePrompt,
+          seed,
+        },
+        subscriptionTier,
+        createdAt: new Date(),
+      });
+
+      logger.info('Text-to-image job queued', { jobId, userId });
+
+      // Return job ID for tracking
+      res.status(202).json({
+        success: true,
+        jobId,
+        message: 'Image generation job queued. Connect via WebSocket for real-time progress.',
+        status: 'queued',
+      });
+
+    } catch (error) {
+      logger.error('Failed to queue text-to-image job', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to queue generation job',
+      });
+    }
+  }
+
+  /**
+   * Queue image-to-video generation job
+   */
+  async imageToVideoAsync(req: Request, res: Response): Promise<void> {
+    try {
+      const { imageUrl, prompt, negativePrompt, duration, cfgScale } = req.body;
+      const userId = req.auth?.userId || req.user?.id;
+
+      if (!userId) {
+        res.status(401).json({ 
+          success: false, 
+          message: 'Authentication required' 
+        });
+        return;
+      }
+
+      if (!imageUrl) {
+        res.status(400).json({
+          success: false,
+          message: 'Image URL is required'
+        });
+        return;
+      }
+
+      const user = await this.ensureUserExists(userId);
+      const subscriptionTier = user.subscriptionTier || 'free';
+
+      // Generate unique job ID
+      const jobId = `vid-${uuid()}`;
+
+      // Queue the job
+      await addVideoGenerationJob({
+        jobId,
+        userId,
+        imageUrl,
+        prompt,
+        negativePrompt,
+        duration: duration || '5',
+        cfgScale: cfgScale || 0.5,
+        subscriptionTier,
+        createdAt: new Date(),
+      });
+
+      logger.info('Video generation job queued', { jobId, userId });
+
+      // Return job ID for tracking
+      res.status(202).json({
+        success: true,
+        jobId,
+        message: 'Video generation job queued. Connect via WebSocket for real-time progress.',
+        status: 'queued',
+      });
+
+    } catch (error) {
+      logger.error('Failed to queue video generation job', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to queue video generation job',
+      });
+    }
+  }
+
+  /**
+   * Get job status
+   */
+  async getJobStatusEndpoint(req: Request, res: Response): Promise<void> {
+    try {
+      const { jobId } = req.params;
+      const userId = req.auth?.userId || req.user?.id;
+
+      if (!userId) {
+        res.status(401).json({ 
+          success: false, 
+          message: 'Authentication required' 
+        });
+        return;
+      }
+
+      // Determine queue type from job ID prefix
+      const queueType = jobId.startsWith('vid-') ? 'video' : 'image';
+      
+      const status = await getJobStatus(jobId, queueType);
+
+      res.status(200).json({
+        success: true,
+        jobId,
+        ...status,
+      });
+
+    } catch (error) {
+      logger.error('Failed to get job status', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to get job status',
       });
     }
   }

@@ -107,4 +107,31 @@ router.post('/image-to-video',
   imageGenerationController.imageToVideo.bind(imageGenerationController)
 );
 
+/**
+ * @route POST /api/generate/text-to-image/async
+ * @description Queue text-to-image generation job for async processing
+ * @access Private
+ */
+router.post('/text-to-image/async',
+  imageGenerationController.textToImageAsync.bind(imageGenerationController)
+);
+
+/**
+ * @route POST /api/generate/image-to-video/async
+ * @description Queue video generation job for async processing
+ * @access Private
+ */
+router.post('/image-to-video/async',
+  imageGenerationController.imageToVideoAsync.bind(imageGenerationController)
+);
+
+/**
+ * @route GET /api/generate/job/:jobId/status
+ * @description Get status of a queued job
+ * @access Private
+ */
+router.get('/job/:jobId/status',
+  imageGenerationController.getJobStatusEndpoint.bind(imageGenerationController)
+);
+
 export default router;

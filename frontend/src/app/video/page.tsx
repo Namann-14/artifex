@@ -8,6 +8,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Loader } from '@/components/ai-elements/loader';
 import { Textarea } from '@/components/ui/textarea';
+import { GenerationProgressTracker } from '@/components/generation/progress-tracker';
+import { useGenerationSocket } from '@/hooks/use-generation-socket';
 import { 
   Select,
   SelectContent,
@@ -28,9 +30,14 @@ import {
 } from 'lucide-react';
 
 export default function VideoGenerationPage() {
-  const { getToken } = useAuth();
+  const { getToken, userId } = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  
+  // WebSocket connection
+  const { connect, disconnect } = useGenerationSocket({
+    userId: userId || undefined,
+  });
   
   // Video generation parameters
   const [imageUrl, setImageUrl] = useState('');
@@ -44,6 +51,7 @@ export default function VideoGenerationPage() {
   // Result state
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [generationStatus, setGenerationStatus] = useState<string>('');
+  const [currentJobId, setCurrentJobId] = useState<string | null>(null);
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -89,7 +97,8 @@ export default function VideoGenerationPage() {
     setLoading(true);
     setError(null);
     setVideoUrl(null);
-    setGenerationStatus('Initializing video generation...');
+    setCurrentJobId(null);
+    setGenerationStatus('Preparing video generation...');
 
     try {
       const token = await getToken();
@@ -133,40 +142,83 @@ export default function VideoGenerationPage() {
         throw new Error('No image URL available');
       }
 
-      setGenerationStatus('Generating video... This may take 1-2 minutes.');
+      // Connect to WebSocket for real-time updates
+      console.log('BEFORE connect()');
+      connect();
+      console.log('AFTER connect()');
+      setGenerationStatus('Submitting video generation job...');
+      console.log('AFTER setGenerationStatus()');
 
-      // Generate video
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1'}/generate/image-to-video`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          imageUrl: finalImageUrl,
-          prompt: prompt || undefined,
-          negativePrompt: negativePrompt || undefined,
-          duration,
-          cfgScale,
-        }),
+      console.log('Sending request to:', `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1'}/video/generate-async`);
+      console.log('Request body:', {
+        imageUrl: finalImageUrl?.substring(0, 100) + '...',
+        prompt,
+        negativePrompt,
+        duration,
+        cfgScale,
       });
 
-      const data = await response.json();
-      
-      if (!response.ok) {
-        console.error('Video generation failed:', data);
-        throw new Error(data.message || data.error || `Failed to generate video (${response.status})`);
-      }
+      // Use the NEW async endpoint for real-time progress with timeout
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => {
+        console.error('REQUEST TIMEOUT - Aborting after 30 seconds');
+        controller.abort();
+      }, 30000); // 30 second timeout
 
-      if (data.success && data.data?.videoUrl) {
-        setVideoUrl(data.data.videoUrl);
-        setGenerationStatus('Video generated successfully!');
-      } else {
-        throw new Error('Video generation failed: No video URL returned');
+      try {
+        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1'}/video/generate-async`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            imageUrl: finalImageUrl,
+            prompt: prompt || undefined,
+            negativePrompt: negativePrompt || undefined,
+            duration,
+            cfgScale,
+          }),
+          signal: controller.signal,
+        });
+        clearTimeout(timeoutId);
+        console.log('Response received!');
+
+        console.log('Response status:', response.status);
+        console.log('Response ok:', response.ok);
+
+        const data = await response.json();
+        console.log('Response data:', data);
+      
+        if (!response.ok) {
+          console.error('Video generation failed:', data);
+          throw new Error(data.message || data.error || `Failed to generate video (${response.status})`);
+        }
+
+        // Async endpoint returns jobId immediately (either at root or in data)
+        const jobId = data.jobId || data.data?.jobId;
+        
+        if (data.success && jobId) {
+          setCurrentJobId(jobId);
+          setGenerationStatus('Video generation queued! Watch the progress below...');
+          setLoading(false); // Allow user to continue browsing
+        } else {
+          throw new Error('Failed to queue video generation');
+        }
+      } catch (fetchError: any) {
+        clearTimeout(timeoutId);
+        if (fetchError.name === 'AbortError') {
+          throw new Error('Request timed out after 30 seconds. Please check your network connection and try again.');
+        }
+        throw fetchError;
       }
 
     } catch (err: any) {
-      console.error('Video generation error:', err);
+      console.error('========== VIDEO GENERATION ERROR ==========');
+      console.error('Error object:', err);
+      console.error('Error message:', err?.message);
+      console.error('Error stack:', err?.stack);
+      console.error('===========================================');
       
       // Provide more helpful error messages
       let errorMessage = err.message || 'Failed to generate video';
@@ -184,8 +236,8 @@ export default function VideoGenerationPage() {
       
       setError(errorMessage);
       setGenerationStatus('');
-    } finally {
       setLoading(false);
+      disconnect();
     }
   };
 
@@ -401,6 +453,35 @@ export default function VideoGenerationPage() {
                       {generationStatus}
                     </AlertDescription>
                   </Alert>
+                )}
+
+                {/* Real-time Progress Tracker - THIS IS WHERE WEBSOCKET/REDIS IS VISIBLE! */}
+                {currentJobId && (
+                  <div className="mb-4">
+                    <GenerationProgressTracker 
+                      jobId={currentJobId}
+                      onComplete={(result) => {
+                        console.log('✅ Generation complete! Result:', result);
+                        if (result?.videoUrl) {
+                          setVideoUrl(result.videoUrl);
+                          setGenerationStatus('Video generated successfully!');
+                          setLoading(false);
+                          setCurrentJobId(null);
+                        } else {
+                          console.error('No video URL in result:', result);
+                          setError('Video generated but no URL was returned');
+                        }
+                        disconnect();
+                      }}
+                      onError={(errorMsg) => {
+                        console.error('❌ Generation error:', errorMsg);
+                        setError(typeof errorMsg === 'string' ? errorMsg : errorMsg?.message || 'Video generation failed');
+                        setCurrentJobId(null);
+                        setLoading(false);
+                        disconnect();
+                      }}
+                    />
+                  </div>
                 )}
 
                 {videoUrl ? (

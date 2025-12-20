@@ -22,6 +22,25 @@ services:
       retries: 5
       start_period: 40s
 
+  # Redis Cache & Queue
+  redis:
+    image: redis:7-alpine
+    container_name: artifex-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - artifex-network
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
   # Backend API
   backend:
     build:
@@ -40,6 +59,11 @@ services:
       # MongoDB Connection
       MONGODB_URI: mongodb://admin:admin123@mongodb:27017/artifex?authSource=admin
       
+      # Redis Connection
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ""
+      
       # Clerk Authentication (Required - Add your keys)
       CLERK_SECRET_KEY: ${CLERK_SECRET_KEY}
       CLERK_PUBLISHABLE_KEY: ${CLERK_PUBLISHABLE_KEY}
@@ -48,6 +72,7 @@ services:
       # Freepik API (Required - Add your key)
       FREEPIK_API_KEY: ${FREEPIK_API_KEY}
       FREEPIK_API_URL: https://api.freepik.com/v1/ai/mystic
+      FREEPIK_VIDEO_API_URL: ${FREEPIK_VIDEO_API_URL:-https://api.freepik.com/v1/ai/image-to-video/kling-v2-5-pro}
       
       # Optional - Cloudinary
       CLOUDINARY_CLOUD_NAME: ${CLOUDINARY_CLOUD_NAME:-}
@@ -69,10 +94,15 @@ services:
       - backend_uploads:/app/uploads
       - backend_temp:/app/public/temp
       - backend_storage:/app/storage/images
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
     networks:
       - artifex-network
     depends_on:
       mongodb:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "node", "-e", "require('http').get('http://localhost:5000/api/v1/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"]
@@ -124,11 +154,18 @@ services:
 networks:
   artifex-network:
     driver: bridge
+    driver_opts:
+      com.docker.network.bridge.name: artifex0
+    ipam:
+      config:
+        - subnet: 172.25.0.0/16
 
 volumes:
   mongodb_data:
     driver: local
   mongodb_config:
+    driver: local
+  redis_data:
     driver: local
   backend_uploads:
     driver: local

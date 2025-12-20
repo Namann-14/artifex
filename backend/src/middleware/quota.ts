@@ -39,8 +39,8 @@ export const checkQuota = (options: QuotaCheckOptions = {}) => {
         return;
       }
 
-      // Fetch user from database
-      const user = await UserModel.findById(req.auth.userId);
+      // Fetch user from database using Clerk ID
+      const user = await UserModel.findByClerkId(req.auth.userId);
       if (!user) {
         res.status(404).json({
           error: 'User not found',
@@ -183,7 +183,7 @@ export const getQuotaStatus = async (req: Request, res: Response): Promise<void>
       return;
     }
 
-    const user = await UserModel.findById(req.auth.userId);
+    const user = await UserModel.findByClerkId(req.auth.userId);
     if (!user) {
       res.status(404).json({
         error: 'User not found',
@@ -236,7 +236,7 @@ export const getQuotaStatus = async (req: Request, res: Response): Promise<void>
  */
 export const getQuotaInfo = async (userId: string, user?: any): Promise<QuotaInfo> => {
   if (!user) {
-    user = await UserModel.findById(userId);
+    user = await UserModel.findByClerkId(userId);
     if (!user) {
       throw new Error('User not found');
     }
