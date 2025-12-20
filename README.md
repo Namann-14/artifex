@@ -162,7 +162,6 @@ NODE_ENV=development
 # Database
 MONGODB_URI=mongodb://localhost:27017/artifex
 # OR for MongoDB Atlas:
-# MONGODB_URI=mongodb+srv://username:password@cluster.mongodb.net/artifex?retryWrites=true&w=majority
 
 # Redis (for job queue and WebSocket)
 REDIS_URL=redis://localhost:6379
