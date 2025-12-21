@@ -276,7 +276,7 @@ export default function VideoGenerationPage() {
               </CardHeader>
               <CardContent className="space-y-4">
                 {/* Image URL Input */}
-                <div className="space-y-2">
+                {/* <div className="space-y-2">
                   <Label htmlFor="imageUrl">Image URL</Label>
                   <Input
                     id="imageUrl"
@@ -289,13 +289,13 @@ export default function VideoGenerationPage() {
                   <p className="text-xs text-muted-foreground">
                     Must be a direct link to an image file (.jpg, .png, etc.)
                   </p>
-                </div>
+                </div> */}
 
-                <div className="flex items-center gap-2">
+                {/* <div className="flex items-center gap-2">
                   <div className="flex-1 border-t border-border" />
                   <span className="text-sm text-muted-foreground">OR</span>
                   <div className="flex-1 border-t border-border" />
-                </div>
+                </div> */}
 
                 {/* Image Upload */}
                 <div className="space-y-2">

@@ -23,6 +23,8 @@ export class GeminiImageService {
   private genAI: GoogleGenerativeAI;
   private genAIImage: GoogleGenAI; // New image generation client
   private models: Map<string, GenerativeModel>;
+  private promptEnhancerModel: GenerativeModel;
+  private lastEnhanceCall: number = 0;
   private readonly defaultModel = 'gemini-2.0-flash-exp';
   private readonly imageModel = 'gemini-2.5-flash-image-preview'; // Updated to image generation model
   
@@ -43,6 +45,17 @@ export class GeminiImageService {
     });
     this.models = new Map();
     this.initializeModels();
+    
+    // Initialize prompt enhancer model with gemini-2.5-flash
+    this.promptEnhancerModel = this.genAI.getGenerativeModel({
+      model: 'gemini-2.5-flash',
+      generationConfig: {
+        temperature: 0.8,
+        topK: 40,
+        topP: 0.95,
+        maxOutputTokens: 512,
+      },
+    });
   }
 
   /**
@@ -837,6 +850,80 @@ export class GeminiImageService {
     
     // Default fallback
     return { width: 1024, height: 1024 };
+  }
+
+  /**
+   * Enhance a user's prompt using Hugging Face for better image generation results
+   */
+  async enhancePrompt(prompt: string, style?: string): Promise<{
+    enhancedPrompt: string;
+    suggestions: string[];
+  }> {
+    try {
+      // Debounce: skip if called within 30 seconds
+      if (Date.now() - this.lastEnhanceCall < 30_000) {
+        console.log('Prompt enhancement skipped due to debounce');
+        return { enhancedPrompt: prompt, suggestions: [] };
+      }
+      this.lastEnhanceCall = Date.now();
+
+      const styleContext = style ? `Intended style: "${style}".` : '';
+
+      const systemPrompt = `You are an expert prompt engineer for AI image generation.
+
+Rules:
+- Preserve original intent
+- Improve lighting, composition, realism
+- Be concise (1–2 sentences)
+- NO explanations
+
+Return ONLY valid JSON:
+{
+  "enhancedPrompt": "...",
+  "suggestions": ["...", "..."]
+}
+
+${styleContext}
+User prompt: "${prompt}"`;
+
+      const axios = require('axios');
+      const response = await axios.post(
+        process.env.HUGGINGFACE_API_URL || 'https://router.huggingface.co/v1/chat/completions',
+        {
+          model: 'openai/gpt-oss-20b:groq',
+          messages: [
+            {
+              role: 'user',
+              content: systemPrompt
+            }
+          ],
+          stream: false
+        },
+        {
+          headers: {
+            'Authorization': `Bearer ${process.env.HUGGINGFACE_API_TOKEN}`,
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+
+      const text = response.data.choices[0].message.content;
+      const cleaned = text.replace(/```json|```/g, '').trim();
+      const parsed = JSON.parse(cleaned);
+
+      return {
+        enhancedPrompt: parsed.enhancedPrompt ?? prompt,
+        suggestions: parsed.suggestions ?? []
+      };
+
+    } catch (error: any) {
+      console.error('Prompt enhancement error:', error?.response?.data || error?.message || error);
+
+      return {
+        enhancedPrompt: prompt,
+        suggestions: []
+      };
+    }
   }
 }
 

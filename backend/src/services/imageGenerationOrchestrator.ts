@@ -11,6 +11,7 @@ import {
   SubscriptionTier
 } from '../types';
 import { FreepikImageService } from './freepikService';
+import { GeminiImageService } from './geminiService';
 import { ImageProcessingService } from './imageProcessingService';
 import { ImageGenerationModel, UserModel } from '../models';
 import { Document } from 'mongoose';
@@ -30,10 +31,12 @@ import {
  */
 export class ImageGenerationOrchestrator {
   private freepikService: FreepikImageService;
+  private geminiService: GeminiImageService;
   private imageProcessingService: ImageProcessingService;
   
   constructor() {
     this.freepikService = new FreepikImageService();
+    this.geminiService = new GeminiImageService();
     this.imageProcessingService = new ImageProcessingService();
   }
 
@@ -1015,6 +1018,16 @@ export class ImageGenerationOrchestrator {
         error.code || 'VIDEO_GENERATION_ERROR'
       );
     }
+  }
+
+  /**
+   * Enhance a prompt using Gemini AI
+   */
+  async enhancePrompt(prompt: string, style?: string): Promise<{
+    enhancedPrompt: string;
+    suggestions: string[];
+  }> {
+    return this.geminiService.enhancePrompt(prompt, style);
   }
 }
 

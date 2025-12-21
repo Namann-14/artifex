@@ -712,6 +712,58 @@ export class ImageGenerationController {
   }
 
   /**
+   * Enhance a prompt using Gemini AI for better image generation
+   */
+  async enhancePrompt(req: Request, res: Response): Promise<void> {
+    try {
+      const userId = req.auth?.userId || req.user?.id;
+
+      if (!userId) {
+        res.status(401).json({ 
+          success: false, 
+          message: 'Authentication required' 
+        });
+        return;
+      }
+
+      const { prompt, style } = req.body;
+
+      if (!prompt || typeof prompt !== 'string' || prompt.trim().length === 0) {
+        res.status(400).json({
+          success: false,
+          message: 'A valid prompt is required'
+        });
+        return;
+      }
+
+      logger.info('Enhance prompt request', { userId, promptLength: prompt.length, style });
+
+      const startTime = Date.now();
+      const result = await this.orchestrator.enhancePrompt(prompt.trim(), style);
+      const processingTime = Date.now() - startTime;
+
+      res.status(200).json({
+        success: true,
+        data: {
+          originalPrompt: prompt.trim(),
+          enhancedPrompt: result.enhancedPrompt,
+          suggestions: result.suggestions
+        },
+        metadata: {
+          processingTime
+        }
+      });
+
+    } catch (error) {
+      logger.error('Enhance prompt error', error as Error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to enhance prompt'
+      });
+    }
+  }
+
+  /**
    * Generate video from image
    */
   async imageToVideo(req: Request, res: Response): Promise<void> {

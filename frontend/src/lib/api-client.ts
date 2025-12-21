@@ -68,12 +68,14 @@ export class APIClient {
     return response.json();
   }
 
-  // Image-to-image transformation
-  static async generateImageToImage(formData: FormData, token: string): Promise<any> {
-    const response = await this.makeRequest('/generate/image-to-image', {
+  // Enhance prompt using Gemini AI
+  static async enhancePrompt(
+    data: { prompt: string; style?: string },
+    token: string
+  ): Promise<any> {
+    const response = await this.makeRequest('/generate/enhance-prompt', {
       method: 'POST',
-      body: formData,
-      headers: {}, // Don't set Content-Type for FormData
+      body: JSON.stringify(data),
     }, true, token);
     return response.json();
   }
@@ -150,10 +152,10 @@ export function useAPIClient() {
       return APIClient.generateTextToImage(data, token);
     },
 
-    async generateImageToImage(formData: FormData) {
+    async enhancePrompt(prompt: string, style?: string) {
       const token = await getToken();
       if (!token) throw new Error('No authentication token available');
-      return APIClient.generateImageToImage(formData, token);
+      return APIClient.enhancePrompt({ prompt, style }, token);
     },
 
     async generateMultiImage(formData: FormData) {

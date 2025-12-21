@@ -29,30 +29,7 @@ router.post('/text-to-image',
   imageGenerationController.textToImage.bind(imageGenerationController)
 );
 
-/**
- * @route POST /api/generate/image-to-image
- * @description Transform existing image with text prompt
- * @access Private
- */
-router.post('/image-to-image',
-  // Add debugging middleware
-  (req, res, next) => {
-    console.log('Image-to-image route hit, Content-Type:', req.get('Content-Type'));
-    console.log('Request body keys:', Object.keys(req.body || {}));
-    next();
-  },
-  validateSubscriptionLimits,
-  uploadSingleImage,
-  // Add debugging after multer
-  (req, res, next) => {
-    console.log('After multer - body:', Object.keys(req.body || {}));
-    console.log('After multer - file:', req.file ? 'Present' : 'Missing');
-    next();
-  },
-  validateRequest(imageToImageSchema),
-  cleanupUploadedFiles,
-  imageGenerationController.imageToImage.bind(imageGenerationController)
-);
+// Image-to-image route removed - feature deprecated
 
 /**
  * @route POST /api/generate/multi-image
@@ -96,6 +73,15 @@ router.get('/history',
  */
 router.get('/quota',
   imageGenerationController.getQuotaStatus.bind(imageGenerationController)
+);
+
+/**
+ * @route POST /api/generate/enhance-prompt
+ * @description Enhance a prompt using Gemini AI for better image generation
+ * @access Private
+ */
+router.post('/enhance-prompt',
+  imageGenerationController.enhancePrompt.bind(imageGenerationController)
 );
 
 /**
