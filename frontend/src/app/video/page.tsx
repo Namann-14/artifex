@@ -348,7 +348,7 @@ export default function VideoGenerationPage() {
               <CardContent className="space-y-4">
                 {/* Prompt */}
                 <div className="space-y-2">
-                  <Label htmlFor="prompt">Prompt (Optional)</Label>
+                  <Label htmlFor="prompt">Prompt</Label>
                   <Textarea
                     id="prompt"
                     placeholder="Describe the video motion or transformation..."
