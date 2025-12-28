@@ -21,13 +21,11 @@ import { Input } from '@/components/ui/input';
 import { 
   Wand2, 
   Image as ImageIcon, 
-  RefreshCw, 
   Download,
   Copy,
   Check,
   Shuffle,
-  Upload,
-  X
+  Sparkles
 } from 'lucide-react';
 
 interface Message {
@@ -38,92 +36,12 @@ interface Message {
   data?: any;
 }
 
-// Test Upload Component
-
-
-const TestImageToImage = () => {
-  const [uploading, setUploading] = useState(false);
-  const [result, setResult] = useState<string>('');
-  const [prompt, setPrompt] = useState('Make this image more vibrant and colorful');
-
-  const handleImageToImage = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    setUploading(true);
-    setResult('');
-
-    try {
-      const formData = new FormData();
-      formData.append('sourceImage', file);
-      formData.append('prompt', prompt);
-
-      console.log('Sending image-to-image request with prompt:', prompt);
-      
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1'}/test/image-to-image`, {
-        method: 'POST',
-        body: formData,
-      });
-
-      console.log('Response status:', response.status);
-      console.log('Response headers:', response.headers.get('content-type'));
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('Response error:', errorText);
-        setResult(`❌ HTTP Error ${response.status}: ${errorText}`);
-        return;
-      }
-
-      const data = await response.json();
-      
-      if (data.success) {
-        setResult(`✅ Image-to-image successful! Generated ${data.data?.images?.length || 1} image(s)`);
-        console.log('Image-to-image result:', data);
-      } else {
-        setResult(`❌ Image-to-image failed: ${data.message || data.error}`);
-      }
-    } catch (error) {
-      console.error('Image-to-image error:', error);
-      setResult(`❌ Error: ${error}`);
-    } finally {
-      setUploading(false);
-    }
-  };
-
-  return (
-    <Card className="mb-6">
-      <CardHeader>
-        <CardTitle>🎨 Test Image-to-Image</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="space-y-4">
-          <Input
-            type="text"
-            placeholder="Enter transformation prompt..."
-            value={prompt}
-            onChange={(e) => setPrompt(e.target.value)}
-            disabled={uploading}
-          />
-          <Input
-            type="file"
-            accept="image/*"
-            onChange={handleImageToImage}
-            disabled={uploading}
-          />
-          {uploading && <p>Processing image...</p>}
-          {result && <p className="text-sm">{result}</p>}
-        </div>
-      </CardContent>
-    </Card>
-  );
-};
-
 const ChatBotDemo = () => {
   const { getToken } = useAuth();
   const [input, setInput] = useState('');
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(false);
+  const [enhancing, setEnhancing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
   
@@ -134,10 +52,37 @@ const ChatBotDemo = () => {
   const [negativePrompt, setNegativePrompt] = useState('blurry, low quality, distorted');
   const [useRandomSeed, setUseRandomSeed] = useState(true);
   const [customSeed, setCustomSeed] = useState('');
-  
-  // Image upload state
-  const [uploadedImage, setUploadedImage] = useState<File | null>(null);
-  const [imagePreview, setImagePreview] = useState<string | null>(null);
+
+  const handleEnhancePrompt = async () => {
+    if (!input.trim() || enhancing) return;
+
+    setEnhancing(true);
+    setError(null);
+
+    try {
+      const token = await getToken();
+      
+      if (!token) {
+        throw new Error('Not authenticated. Please sign in first.');
+      }
+
+      const result = await APIClient.enhancePrompt(
+        { prompt: input.trim(), style },
+        token
+      );
+
+      if (result.success && result.data?.enhancedPrompt) {
+        setInput(result.data.enhancedPrompt);
+      } else {
+        throw new Error(result.message || 'Failed to enhance prompt');
+      }
+    } catch (err: any) {
+      console.error('Enhance prompt error:', err);
+      setError(err.message || 'Failed to enhance prompt');
+    } finally {
+      setEnhancing(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -152,20 +97,52 @@ const ChatBotDemo = () => {
     };
 
     setMessages(prev => [...prev, userMessage]);
-    const originalInput = input.trim();
+    const promptText = input.trim();
     setInput('');
     setLoading(true);
     setError(null);
 
     try {
-      // Determine if this should be image-to-image or text-to-image
-      const isImageToImage = uploadedImage !== null;
-      await handleSubmitWithImage(isImageToImage);
-
-      // Clear uploaded image after successful generation
-      if (uploadedImage) {
-        removeUploadedImage();
+      const token = await getToken();
+      
+      if (!token) {
+        throw new Error('Not authenticated. Please sign in first.');
       }
+
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1'}/generate/text-to-image`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          prompt: promptText,
+          aspectRatio,
+          style,
+          quality,
+          negativePrompt: negativePrompt.trim() || undefined,
+          seed: useRandomSeed ? 
+            Math.floor(Math.random() * 1000000) + Date.now() % 100000 : 
+            (parseInt(customSeed) || Math.floor(Math.random() * 1000000))
+        }),
+      });
+
+      const result = await response.json();
+      console.log('Text-to-Image API Response:', result);
+
+      if (!response.ok || !result.success) {
+        throw new Error(result.message || result.error || 'Generation failed');
+      }
+
+      const assistantMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        role: 'assistant',
+        content: result.message || 'Image generation completed successfully!',
+        timestamp: new Date(),
+        data: result.data,
+      };
+
+      setMessages(prev => [...prev, assistantMessage]);
 
     } catch (err: any) {
       console.error('Generation error:', err);
@@ -191,123 +168,6 @@ const ChatBotDemo = () => {
       setTimeout(() => setCopied(null), 2000);
     } catch (err) {
       console.error('Failed to copy:', err);
-    }
-  };
-
-  const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      // Validate file type
-      if (!file.type.startsWith('image/')) {
-        setError('Please select a valid image file');
-        return;
-      }
-      
-      // Validate file size (max 10MB)
-      if (file.size > 10 * 1024 * 1024) {
-        setError('Image size must be less than 10MB');
-        return;
-      }
-
-      setUploadedImage(file);
-      
-      // Create preview
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        setImagePreview(e.target?.result as string);
-      };
-      reader.readAsDataURL(file);
-      setError(null);
-    }
-  };
-
-  const removeUploadedImage = () => {
-    setUploadedImage(null);
-    setImagePreview(null);
-  };
-
-  const handleSubmitWithImage = async (isImageToImage: boolean = false) => {
-    try {
-      const token = await getToken();
-      
-      if (!token) {
-        throw new Error('Not authenticated. Please sign in first.');
-      }
-
-      if (isImageToImage && !uploadedImage) {
-        throw new Error('Please upload an image for image-to-image generation');
-      }
-
-      let result;
-
-      if (isImageToImage && uploadedImage) {
-        // Use working direct image-to-image approach
-        const formData = new FormData();
-        formData.append('sourceImage', uploadedImage);
-        formData.append('prompt', input.trim());
-        
-        console.log('Sending image-to-image request with prompt:', input.trim());
-        
-        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1'}/test/image-to-image`, {
-          method: 'POST',
-          body: formData,
-        });
-
-        console.log('Response status:', response.status);
-
-        if (!response.ok) {
-          const errorText = await response.text();
-          console.error('Response error:', errorText);
-          throw new Error(`HTTP Error ${response.status}: ${errorText}`);
-        }
-
-        result = await response.json();
-        console.log('Image-to-Image API Response:', result);
-      } else {
-        // Use regular text-to-image generation
-        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1'}/generate/text-to-image`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`,
-          },
-          body: JSON.stringify({
-            prompt: input.trim(),
-            aspectRatio,
-            style,
-            quality,
-            negativePrompt: negativePrompt.trim() || undefined,
-            seed: useRandomSeed ? 
-              Math.floor(Math.random() * 1000000) + Date.now() % 100000 : 
-              (parseInt(customSeed) || Math.floor(Math.random() * 1000000))
-          }),
-        });
-
-        result = await response.json();
-        console.log('Text-to-Image API Response:', result);
-
-        if (!response.ok || !result.success) {
-          throw new Error(result.message || result.error || 'Generation failed');
-        }
-      }
-
-      if (!result.success) {
-        throw new Error(result.message || result.error || 'Generation failed');
-      }
-
-      const assistantMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        role: 'assistant',
-        content: result.message || `${isImageToImage ? 'Image transformation' : 'Image generation'} completed successfully!`,
-        timestamp: new Date(),
-        data: result.data,
-      };
-
-      setMessages(prev => [...prev, assistantMessage]);
-
-    } catch (err: any) {
-      console.error('Generation error:', err);
-      throw err; // Re-throw to be handled by calling function
     }
   };
 
@@ -432,79 +292,35 @@ const ChatBotDemo = () => {
             <CardContent className="pt-6">
               <form onSubmit={handleSubmit} className="space-y-4">
                 
-                {/* Image Upload Section */}
-                <div className="space-y-3">
+                {/* Prompt Input with Enhance Button */}
+                <div className="space-y-2">
                   <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium">Upload Image (Optional)</span>
-                    <span className="text-xs text-muted-foreground">
-                      {uploadedImage ? 'Image-to-Image Mode' : 'Text-to-Image Mode'}
-                    </span>
+                    <span className="text-sm font-medium">Describe your image</span>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={handleEnhancePrompt}
+                      disabled={!input.trim() || enhancing || loading}
+                      className="text-xs h-7 px-2"
+                    >
+                      {enhancing ? (
+                        <>
+                          <Loader />
+                          <span className="ml-1">Enhancing...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles className="h-3.5 w-3.5 mr-1" />
+                          Enhance Prompt
+                        </>
+                      )}
+                    </Button>
                   </div>
-                  
-                  {!imagePreview ? (
-                    <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-6">
-                      <input
-                        type="file"
-                        accept="image/*"
-                        onChange={handleImageUpload}
-                        className="hidden"
-                        id="image-upload"
-                        disabled={loading}
-                      />
-                      <label
-                        htmlFor="image-upload"
-                        className="flex flex-col items-center justify-center cursor-pointer hover:bg-muted/50 transition-colors rounded-lg p-4"
-                      >
-                        <Upload className="h-8 w-8 text-muted-foreground mb-2" />
-                        <span className="text-sm text-muted-foreground">
-                          Click to upload an image for transformation
-                        </span>
-                        <span className="text-xs text-muted-foreground mt-1">
-                          Supports JPG, PNG, WebP (max 10MB)
-                        </span>
-                      </label>
-                    </div>
-                  ) : (
-                    <div className="relative border rounded-lg p-3 bg-muted/20">
-                      <div className="flex items-start gap-3">
-                        <img
-                          src={imagePreview}
-                          alt="Uploaded preview"
-                          className="w-20 h-20 object-cover rounded"
-                        />
-                        <div className="flex-1">
-                          <p className="text-sm font-medium">{uploadedImage?.name}</p>
-                          <p className="text-xs text-muted-foreground">
-                            {uploadedImage && (uploadedImage.size / 1024 / 1024).toFixed(2)} MB
-                          </p>
-                          <p className="text-xs text-muted-foreground mt-1">
-                            Ready for image-to-image transformation
-                          </p>
-                        </div>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          onClick={removeUploadedImage}
-                          disabled={loading}
-                          className="h-8 w-8 p-0"
-                        >
-                          <X className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                <div>
                   <Textarea
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
-                    placeholder={
-                      uploadedImage 
-                        ? "Describe how you want to transform the uploaded image... (e.g., 'Make it look like a painting', 'Change it to nighttime')"
-                        : "Describe the image you want to generate... (e.g., 'A majestic mountain landscape at sunset with snow-capped peaks')"
-                    }
+                    placeholder="Describe the image you want to generate... (e.g., 'A majestic mountain landscape at sunset with snow-capped peaks')"
                     className="min-h-[100px] resize-none"
                     disabled={loading}
                   />
@@ -620,14 +436,12 @@ const ChatBotDemo = () => {
                     {loading ? (
                       <>
                         <Loader />
-                        <span className="ml-2">
-                          {uploadedImage ? 'Transforming...' : 'Generating...'}
-                        </span>
+                        <span className="ml-2">Generating...</span>
                       </>
                     ) : (
                       <>
                         <ImageIcon className="h-4 w-4 mr-2" />
-                        {uploadedImage ? 'Transform Image' : 'Generate Image'}
+                        Generate Image
                       </>
                     )}
                   </Button>
@@ -637,11 +451,10 @@ const ChatBotDemo = () => {
                     onClick={() => {
                       setInput('');
                       setError(null);
-                      removeUploadedImage();
                     }}
                     disabled={loading}
                   >
-                    Clear All
+                    Clear
                   </Button>
                 </div>
               </form>

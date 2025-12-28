@@ -9,10 +9,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Loader } from '@/components/ai-elements/loader';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { RefreshCw, Image, Search, Filter, Heart, Download, Eye } from 'lucide-react';
+import { RefreshCw, Image, Search, Heart, Download, Eye } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface GenerationHistory {
@@ -54,9 +53,6 @@ export default function GalleryPage() {
   const [error, setError] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [searchQuery, setSearchQuery] = useState('');
-  const [typeFilter, setTypeFilter] = useState<string>('');
-  const [statusFilter, setStatusFilter] = useState<string>('');
-  const [favoriteFilter, setFavoriteFilter] = useState<string>('');
   const [selectedImage, setSelectedImage] = useState<GenerationHistory | null>(null);
 
   const fetchGenerations = async (page = 1) => {
@@ -67,15 +63,27 @@ export default function GalleryPage() {
       const params = new URLSearchParams({
         page: page.toString(),
         limit: '12',
-        ...(typeFilter && { type: typeFilter }),
-        ...(statusFilter && { status: statusFilter }),
-        ...(favoriteFilter && { isFavorite: favoriteFilter }),
+        status: 'completed', // Only fetch completed images
       });
 
-      const response = await apiClient.getGenerationHistory(page, 12, typeFilter);
+      const response = await apiClient.getGenerationHistory(page, 12, '');
       
       if (response && response.success) {
-        setGenerations(response.data.generations || []);
+        let filteredGenerations = response.data.generations || [];
+        
+        // Filter out processing and non-completed images
+        filteredGenerations = filteredGenerations.filter((gen: GenerationHistory) =>
+          gen.status === 'completed'
+        );
+        
+        // Apply search filter on prompt
+        if (searchQuery.trim()) {
+          filteredGenerations = filteredGenerations.filter((gen: GenerationHistory) =>
+            gen.prompt.toLowerCase().includes(searchQuery.toLowerCase())
+          );
+        }
+        
+        setGenerations(filteredGenerations);
         setPagination(response.data.pagination || null);
       } else {
         throw new Error(response?.message || 'Failed to fetch generations');
@@ -90,7 +98,7 @@ export default function GalleryPage() {
 
   useEffect(() => {
     fetchGenerations(currentPage);
-  }, [currentPage, typeFilter, statusFilter, favoriteFilter]);
+  }, [currentPage, searchQuery]);
 
   const handlePageChange = (newPage: number) => {
     setCurrentPage(newPage);
@@ -157,71 +165,23 @@ export default function GalleryPage() {
               </Button>
             </div>
 
-            {/* Filters */}
+            {/* Search Bar */}
             <Card className="mb-6">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <Filter className="h-5 w-5" />
-                  Filters
+                  <Search className="h-5 w-5" />
+                  Search
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                  <div>
-                    <label className="text-sm font-medium mb-2 block">Search</label>
-                    <div className="relative">
-                      <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                      <Input
-                        placeholder="Search prompts..."
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        className="pl-10"
-                      />
-                    </div>
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium mb-2 block">Type</label>
-                    <Select value={typeFilter || "all"} onValueChange={(value) => setTypeFilter(value === "all" ? "" : value)}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="All types" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All types</SelectItem>
-                        <SelectItem value="text-to-image">Text to Image</SelectItem>
-                        <SelectItem value="image-to-image">Image to Image</SelectItem>
-                        <SelectItem value="multi-image-composition">Multi Image</SelectItem>
-                        <SelectItem value="refine-image">Refine Image</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium mb-2 block">Status</label>
-                    <Select value={statusFilter || "all"} onValueChange={(value) => setStatusFilter(value === "all" ? "" : value)}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="All statuses" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All statuses</SelectItem>
-                        <SelectItem value="completed">Completed</SelectItem>
-                        <SelectItem value="processing">Processing</SelectItem>
-                        <SelectItem value="pending">Pending</SelectItem>
-                        <SelectItem value="failed">Failed</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium mb-2 block">Favorites</label>
-                    <Select value={favoriteFilter || "all"} onValueChange={(value) => setFavoriteFilter(value === "all" ? "" : value)}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="All images" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All images</SelectItem>
-                        <SelectItem value="true">Favorites only</SelectItem>
-                        <SelectItem value="false">Non-favorites</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
+                <div className="relative">
+                  <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search prompts..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pl-10"
+                  />
                 </div>
               </CardContent>
             </Card>

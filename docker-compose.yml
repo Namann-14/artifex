@@ -74,6 +74,13 @@ services:
       FREEPIK_API_URL: https://api.freepik.com/v1/ai/mystic
       FREEPIK_VIDEO_API_URL: ${FREEPIK_VIDEO_API_URL:-https://api.freepik.com/v1/ai/image-to-video/kling-v2-5-pro}
       
+      # Gemini API (Required for prompt enhancement)
+      GEMINI_API_KEY: ${GEMINI_API_KEY}
+      
+      # Hugging Face API (Required for prompt enhancement)
+      HUGGINGFACE_API_TOKEN: ${HUGGINGFACE_API_TOKEN}
+      HUGGINGFACE_API_URL: ${HUGGINGFACE_API_URL:-https://router.huggingface.co/v1/chat/completions}
+      
       # Optional - Cloudinary
       CLOUDINARY_CLOUD_NAME: ${CLOUDINARY_CLOUD_NAME:-}
       CLOUDINARY_API_KEY: ${CLOUDINARY_API_KEY:-}

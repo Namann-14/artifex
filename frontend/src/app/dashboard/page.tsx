@@ -111,7 +111,11 @@ export default function DashboardPage() {
       try {
         const historyResponse = await apiClient.getGenerationHistory(1, 6); // Get recent 6 images
         if (historyResponse && historyResponse.success) {
-          setGenerationHistory(historyResponse.data.generations || []);
+          // Filter to only show completed generations
+          const completedGenerations = (historyResponse.data.generations || []).filter(
+            (gen: GenerationHistory) => gen.status === 'completed'
+          );
+          setGenerationHistory(completedGenerations);
         }
       } catch (historyError) {
         console.error('Failed to fetch generation history:', historyError);
@@ -192,7 +196,7 @@ export default function DashboardPage() {
 
             {/* Dashboard Content */}
             {!loading && (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              <div className="grid grid-cols-1 gap-6">
                 {/* User Info Card */}
                 <Card>
                   <CardHeader>
@@ -228,89 +232,8 @@ export default function DashboardPage() {
                   </CardContent>
                 </Card>
 
-                {/* Subscription Card */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <Zap className="h-5 w-5" />
-                      Subscription
-                    </CardTitle>
-                    <CardDescription>Your current plan</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-2">
-                      <div>
-                        <p className="text-sm text-muted-foreground">Plan</p>
-                        <Badge variant="outline" className="capitalize">
-                          {quotaData?.subscription?.tier || 'Free'}
-                        </Badge>
-                      </div>
-                      <div>
-                        <p className="text-sm text-muted-foreground">Status</p>
-                        <Badge variant={quotaData?.subscription?.status === 'active' ? 'default' : 'secondary'}>
-                          {quotaData?.subscription?.status || 'Unknown'}
-                        </Badge>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                {/* Text-to-Image Quota */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <Image className="h-5 w-5" />
-                      Text-to-Image
-                    </CardTitle>
-                    <CardDescription>Generation quota</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-2">
-                      <div>
-                        <p className="text-sm text-muted-foreground">Used</p>
-                        <p className="font-medium">
-                          {quotaData?.quota?.textToImage?.used || 0} / {quotaData?.quota?.textToImage?.limit || 10}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-sm text-muted-foreground">Remaining</p>
-                        <p className="font-medium text-primary">
-                          {quotaData?.quota?.textToImage?.remaining || 10}
-                        </p>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                {/* Image-to-Image Quota */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <RefreshCw className="h-5 w-5" />
-                      Image-to-Image
-                    </CardTitle>
-                    <CardDescription>Transformation quota</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-2">
-                      <div>
-                        <p className="text-sm text-muted-foreground">Used</p>
-                        <p className="font-medium">
-                          {quotaData?.quota?.imageToImage?.used || 0} / {quotaData?.quota?.imageToImage?.limit || 5}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-sm text-muted-foreground">Remaining</p>
-                        <p className="font-medium text-primary">
-                          {quotaData?.quota?.imageToImage?.remaining || 5}
-                        </p>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-
                 {/* Recent Activity */}
-                <Card className="md:col-span-2">
+                <Card>
                   <CardHeader>
                     <CardTitle className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
