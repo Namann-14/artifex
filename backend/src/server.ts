@@ -1,4 +1,5 @@
 import http from 'http';
+import dns from 'dns';
 import app from './app';
 import { connectDB, disconnectDB } from './config/database';
 import { config } from './config/env';
@@ -22,6 +23,12 @@ process.on('unhandledRejection', (reason: unknown, promise: Promise<unknown>) =>
 // Start the server
 const startServer = async () => {
   try {
+    const dnsServers = config.DNS_SERVERS?.split(',').map((value) => value.trim()).filter(Boolean) || [];
+    if (dnsServers.length > 0) {
+      dns.setServers(dnsServers);
+      logger.info(`🧭 DNS servers set to: ${dnsServers.join(', ')}`);
+    }
+
     // Connect to MongoDB
     await connectDB();
     

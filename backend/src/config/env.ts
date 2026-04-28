@@ -10,6 +10,7 @@ const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
   MONGODB_URI: z.string().min(1, 'MONGODB_URI is required'),
   CORS_ORIGIN: z.string().default('http://localhost:3000'),
+  DNS_SERVERS: z.string().optional(),
   
   // Clerk Authentication (required for production)
   CLERK_SECRET_KEY: z.string().min(1, 'CLERK_SECRET_KEY is required'),
